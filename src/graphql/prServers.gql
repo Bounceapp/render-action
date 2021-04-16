@@ -1,0 +1,10 @@
+query PullRequestServers($serverId: String!) {
+  pullRequestServers(serverId: $serverId) {
+    pullRequest {
+      number
+    }
+    server {
+      id
+    }
+  }
+}

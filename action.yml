@@ -1,11 +1,16 @@
-name: 'Your name here'
-description: 'Provide a description here'
-author: 'Your name or organization here'
+name: Render GitHub Action
+description: GitHub Action to check a Render deployment status
+author: Bounce Inc.
 inputs:
-  milliseconds: # change this
+  email:
     required: true
-    description: 'input description here'
-    default: 'default value if applicable'
+    description: Render user email
+  password:
+    required: true
+    description: Render password
+  service-id:
+    required: true
+    description: Render service id
 runs:
-  using: 'node12'
-  main: 'dist/index.js'
+  using: node12
+  main: dist/index.js

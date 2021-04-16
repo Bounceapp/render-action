@@ -1,0 +1,9 @@
+query Deploys($serverId: String!) {
+  deploys(serverId: $serverId) {
+    id
+    status
+    branch
+    commitId
+    createdAt
+  }
+}

@@ -1,0 +1,9 @@
+overwrite: true
+schema: https://api.render.com/graphql
+documents: src/**/*.gql
+generates:
+  src/generated/sdk.ts:
+    plugins:
+      - typescript
+      - typescript-operations
+      - typescript-graphql-request

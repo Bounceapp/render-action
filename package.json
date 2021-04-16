@@ -1,6 +1,6 @@
 {
-  "name": "typescript-action",
-  "version": "0.0.0",
+  "name": "render-action",
+  "version": "0.1.0",
   "private": true,
   "description": "TypeScript template action",
   "main": "lib/main.js",
@@ -11,23 +11,31 @@
     "lint": "eslint src/**/*.ts",
     "package": "ncc build --source-map --license licenses.txt",
     "test": "jest",
-    "all": "npm run build && npm run format && npm run lint && npm run package && npm test"
+    "all": "npm run build && npm run format && npm run lint && npm run package",
+    "generate": "graphql-codegen --config codegen.yml"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/actions/typescript-action.git"
+    "url": "git+https://github.com/Bounceapp/render-action.git"
   },
   "keywords": [
     "actions",
     "node",
-    "setup"
+    "render"
   ],
-  "author": "",
+  "author": "Guilherme Duarte",
   "license": "MIT",
   "dependencies": {
-    "@actions/core": "^1.2.7"
+    "@actions/core": "^1.2.7",
+    "@actions/github": "^4.0.0",
+    "graphql": "^15.5.0"
   },
   "devDependencies": {
+    "@graphql-codegen/cli": "1.21.3",
+    "@graphql-codegen/typescript": "1.21.1",
+    "@graphql-codegen/typescript-graphql-request": "^3.1.0",
+    "@graphql-codegen/typescript-operations": "1.17.15",
+    "@octokit/webhooks-definitions": "^3.67.3",
     "@types/jest": "^26.0.15",
     "@types/node": "^14.14.41",
     "@typescript-eslint/parser": "^4.8.1",
