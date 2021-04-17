@@ -4,13 +4,16 @@ author: Bounce Inc.
 inputs:
   email:
     required: true
-    description: Render user email
+    description: User email used to sign-in to Render's API
   password:
     required: true
-    description: Render password
+    description: User password used to sign-in to Render's API
   service-id:
     required: true
-    description: Render service id
+    description: The id of the Render service to be tracked
+  token:
+    required: true
+    description: GitHub token
 runs:
   using: node12
   main: dist/index.js

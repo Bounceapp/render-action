@@ -86,7 +86,12 @@ var UserFacingTypeSlug;
 exports.DeployDocument = graphql_tag_1.default `
     query Deploy($id: String!) {
   deploy(id: $id) {
+    id
     status
+    server {
+      id
+      url
+    }
   }
 }
     `;
@@ -97,7 +102,10 @@ exports.DeploysDocument = graphql_tag_1.default `
     status
     branch
     commitId
-    createdAt
+    server {
+      id
+      name
+    }
   }
 }
     `;
@@ -176,8 +184,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-const core = __importStar(__webpack_require__(2186));
-const github = __importStar(__webpack_require__(5438));
+const Core = __importStar(__webpack_require__(2186));
+const Github = __importStar(__webpack_require__(5438));
 const graphql_request_1 = __webpack_require__(2476);
 const sdk_1 = __webpack_require__(1498);
 const wait_1 = __webpack_require__(5817);
@@ -185,16 +193,22 @@ const wait_1 = __webpack_require__(5817);
  *** Constants
  ******************************************/
 const MAX_RETRIES = 10;
+/*******************************************
+ *** Globals
+ ******************************************/
 const client = new graphql_request_1.GraphQLClient('https://api.render.com/graphql');
 const sdk = sdk_1.getSdk(client);
+const octokit = Github.getOctokit(Core.getInput('token'), {
+    previews: ['flash', 'ant-man']
+});
 /*******************************************
  *** Functions
  ******************************************/
 function logIn() {
     return __awaiter(this, void 0, void 0, function* () {
-        const email = core.getInput('email');
-        const password = core.getInput('password');
-        core.info('Signing in...');
+        Core.info('Signing in...');
+        const email = Core.getInput('email');
+        const password = Core.getInput('password');
         const { signIn } = yield sdk.SignIn({ email, password });
         if (!(signIn === null || signIn === void 0 ? void 0 : signIn.idToken)) {
             throw new Error('Sign-in failed!');
@@ -202,37 +216,37 @@ function logIn() {
         client.setHeader('authorization', `Bearer ${signIn.idToken}`);
     });
 }
-function findServer() {
-    var _a, _b;
+function findServer({ pr }) {
     return __awaiter(this, void 0, void 0, function* () {
-        const serverId = core.getInput('service-id');
-        const pr = (_a = github.context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.number;
+        const serverId = Core.getInput('service-id');
         if (pr) {
-            core.info('Running in Pull Request: Listing Pull Request Servers...');
-            const servers = yield sdk.PullRequestServers({ serverId });
-            const server = (_b = servers.pullRequestServers) === null || _b === void 0 ? void 0 : _b.find(s => (s === null || s === void 0 ? void 0 : s.pullRequest.number) === pr.toString());
+            Core.info('Running in Pull Request: Listing Pull Request Servers...');
+            const number = pr.toString();
+            const { pullRequestServers } = yield sdk.PullRequestServers({ serverId });
+            const server = pullRequestServers === null || pullRequestServers === void 0 ? void 0 : pullRequestServers.find(s => (s === null || s === void 0 ? void 0 : s.pullRequest.number) === number);
             if (server) {
                 return server.server.id;
             }
-            core.info('No Pull Request Servers found. Using regular deployment');
+            Core.info('No Pull Request Servers found. Using regular deployment');
         }
         return serverId;
     });
 }
 function getContext() {
-    switch (github.context.eventName) {
+    const { eventName, payload } = Github.context;
+    switch (eventName) {
         case 'pull_request':
-            return github.context.payload.pull_request.head;
+            const { pull_request: { number, head } } = payload;
+            return Object.assign({ pr: number }, head);
         case 'push':
-            return github.context;
+            return Github.context;
         default:
             throw new Error('Invalid event type! Only "pull_request" and "push" are supported. ❌');
     }
 }
-function findDeploy(serverId, retries = 0) {
+function findDeploy(context, serverId, retries = 0) {
     return __awaiter(this, void 0, void 0, function* () {
-        const context = getContext();
-        core.info(`Listing deployments for ${context}...`);
+        Core.info(`Listing deployments for ${serverId}...`);
         const { deploys } = yield sdk.Deploys({ serverId });
         const deploy = deploys === null || deploys === void 0 ? void 0 : deploys.find(d => d.commitId === context.sha &&
             d.branch === context.ref.replace('refs/heads/', ''));
@@ -240,9 +254,9 @@ function findDeploy(serverId, retries = 0) {
             return deploy;
         }
         if (++retries < MAX_RETRIES) {
-            core.info(`No deployments found. Retrying...(${retries}/${MAX_RETRIES}) ⏱`);
+            Core.info(`No deployments found. Retrying...(${retries}/${MAX_RETRIES}) ⏱`);
             yield wait_1.wait(5000);
-            return findDeploy(serverId, retries);
+            return findDeploy(context, serverId, retries);
         }
         else {
             throw new Error(`No deployment found after ${retries} retries! ⚠️`);
@@ -251,30 +265,50 @@ function findDeploy(serverId, retries = 0) {
 }
 function getDeploy(id) {
     return __awaiter(this, void 0, void 0, function* () {
-        const response = yield sdk.Deploy({ id });
-        if (!(response === null || response === void 0 ? void 0 : response.deploy)) {
+        const { deploy } = yield sdk.Deploy({ id });
+        if (!deploy) {
             throw new Error(`Deployment ${id} disappeared! ❌`);
         }
-        return response.deploy;
+        return deploy;
     });
 }
-function waitForDeploy(deploy) {
+function waitForDeploy(deployment) {
     return __awaiter(this, void 0, void 0, function* () {
-        switch (deploy === null || deploy === void 0 ? void 0 : deploy.status) {
+        const { render } = deployment;
+        switch (render === null || render === void 0 ? void 0 : render.status) {
             case 1: // Running
-                core.info(`Deployment still running... ⏱`);
+                yield updateDeployment(deployment, 'in_progress');
+                Core.info(`Deployment still running... ⏱`);
                 yield wait_1.wait(1000);
-                deploy = yield getDeploy(deploy.id);
-                return waitForDeploy(deploy);
+                return waitForDeploy(Object.assign(Object.assign({}, deployment), { render: yield getDeploy(render.id) }));
             case 2: // Live
             case 3: // Succeeded
-                core.info(`Deployment ${deploy.id} succeeded ✅`);
+                yield updateDeployment(deployment, 'success');
+                Core.info(`Deployment ${render.id} succeeded ✅`);
                 return;
             case 4: // Failed
-                throw new Error(`Deployment ${deploy.id} failed! ❌`);
+                yield updateDeployment(deployment, 'failure');
+                throw new Error(`Deployment ${render.id} failed! ❌`);
             case 5: // Cancelled
-                core.info(`Deployment ${deploy.id} canceled ⏹`);
+                yield updateDeployment(deployment, 'inactive');
+                Core.info(`Deployment ${render.id} canceled ⏹`);
                 return;
+        }
+    });
+}
+function createDeployment(context, { server }) {
+    return __awaiter(this, void 0, void 0, function* () {
+        Core.info(`Creating ${server.name} GitHub deployment`);
+        const state = 'pending';
+        const { data } = yield octokit.repos.createDeployment(Object.assign(Object.assign({}, Github.context.repo), { ref: context.ref, description: server.name, environment: `${context.pr ? 'Preview' : 'Production'} - ${server.name}`, production_environment: !context.pr, transient_environment: !!context.pr, auto_merge: false, required_contexts: [], state }));
+        return Object.assign(Object.assign({}, data), { state });
+    });
+}
+function updateDeployment({ render, github }, state) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (github.state !== state) {
+            yield octokit.repos.createDeploymentStatus(Object.assign(Object.assign({}, Github.context.repo), { deployment_id: github.id, log_url: `https://dashboard.render.com/web/${render.server.id}/deploys/${render.id}`, environment_url: render.server.url, description: state, state }));
+            github.state = state;
         }
     });
 }
@@ -284,14 +318,16 @@ function waitForDeploy(deploy) {
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            core.info('Starting Render Wait Action');
+            Core.info('Starting Render Wait Action');
             yield logIn();
-            const serverId = yield findServer();
-            const deploy = yield findDeploy(serverId);
-            waitForDeploy(deploy);
+            const context = getContext();
+            const serverId = yield findServer(context);
+            const render = yield findDeploy(context, serverId);
+            const github = yield createDeployment(context, render);
+            yield waitForDeploy({ render, github });
         }
         catch (error) {
-            core.setFailed(error.message);
+            Core.setFailed(error.message);
         }
     });
 }

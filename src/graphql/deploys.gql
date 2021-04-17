@@ -4,6 +4,9 @@ query Deploys($serverId: String!) {
     status
     branch
     commitId
-    createdAt
+    server {
+      id
+      name
+    }
   }
 }

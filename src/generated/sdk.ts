@@ -2621,7 +2621,11 @@ export type DeployQuery = (
   { __typename?: 'Query' }
   & { deploy?: Maybe<(
     { __typename?: 'Deploy' }
-    & Pick<Deploy, 'status'>
+    & Pick<Deploy, 'id' | 'status'>
+    & { server: (
+      { __typename?: 'Server' }
+      & Pick<Server, 'id' | 'url'>
+    ) }
   )> }
 );
 
@@ -2634,7 +2638,11 @@ export type DeploysQuery = (
   { __typename?: 'Query' }
   & { deploys: Array<(
     { __typename?: 'Deploy' }
-    & Pick<Deploy, 'id' | 'status' | 'branch' | 'commitId' | 'createdAt'>
+    & Pick<Deploy, 'id' | 'status' | 'branch' | 'commitId'>
+    & { server: (
+      { __typename?: 'Server' }
+      & Pick<Server, 'id' | 'name'>
+    ) }
   )> }
 );
 
@@ -2675,7 +2683,12 @@ export type SignInMutation = (
 export const DeployDocument = gql`
     query Deploy($id: String!) {
   deploy(id: $id) {
+    id
     status
+    server {
+      id
+      url
+    }
   }
 }
     `;
@@ -2686,7 +2699,10 @@ export const DeploysDocument = gql`
     status
     branch
     commitId
-    createdAt
+    server {
+      id
+      name
+    }
   }
 }
     `;

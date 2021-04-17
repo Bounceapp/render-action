@@ -6,21 +6,47 @@
 
 Use this action to track a deployment on [Render](https://render.com)
 
-## Publish to a distribution branch
+## Action Inputs
+
+| name         | description                                   |
+| ------------ | --------------------------------------------- |
+| `email`      | User email used to sign-in to Render's API    |
+| `password`   | User password used to sign-in to Render's API |
+| `service-id` | The id of the Render service to be tracked    |
+| `token`      | GitHub token                                  |
+
+## Example usage
+
+```yaml
+name: Render
+on: [pull_request]:
+jobs:
+  deploy:
+    name: Wait for Deploy
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Wait for Render Deployment
+        uses: bounceapp/render-action@0.2.0
+        with:
+          email: ${{ secrets.RENDER_EMAIL }}
+          password: ${{ secrets.RENDER_PASSWORD }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          service-id: srv-xxxxxxxxxxxxxxxxxxxx
+```
+
+## Contribute
+
+### Publish to a distribution branch
 
 Actions are run from GitHub repos so we will checkin the packed dist folder.
 
 Then run [ncc](https://github.com/zeit/ncc) and push the results:
 
 ```bash
-$ npm run package
+$ npm run all
 $ git add dist
 $ git commit -a -m "prod dependencies"
 $ git push origin releases/v1
 ```
-
-Note: We recommend using the `--license` option for ncc, which will create a license file for all of the production node modules used in your project.
-
-Your action is now published! :rocket:
 
 See the [versioning documentation](https://github.com/actions/toolkit/blob/master/docs/action-versioning.md)
