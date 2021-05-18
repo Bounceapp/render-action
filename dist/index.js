@@ -34,6 +34,7 @@ var DatabaseStatus;
     DatabaseStatus["Available"] = "AVAILABLE";
     DatabaseStatus["Unavailable"] = "UNAVAILABLE";
     DatabaseStatus["Suspended"] = "SUSPENDED";
+    DatabaseStatus["Unknown"] = "UNKNOWN";
 })(DatabaseStatus = exports.DatabaseStatus || (exports.DatabaseStatus = {}));
 var DatabaseType;
 (function (DatabaseType) {
@@ -192,7 +193,7 @@ const wait_1 = __webpack_require__(5817);
 /*******************************************
  *** Constants
  ******************************************/
-const MAX_RETRIES = 10;
+const MAX_RETRIES = 20;
 /*******************************************
  *** Globals
  ******************************************/
@@ -246,7 +247,7 @@ function getContext() {
 }
 function findDeploy(context, serverId, retries = 0) {
     return __awaiter(this, void 0, void 0, function* () {
-        Core.info(`Listing deployments for ${serverId}...`);
+        Core.info(`Looking deployments for ${serverId}...`);
         const { deploys } = yield sdk.Deploys({ serverId });
         const deploy = deploys === null || deploys === void 0 ? void 0 : deploys.find(d => d.commitId === context.sha &&
             d.branch === context.ref.replace('refs/heads/', ''));
@@ -254,7 +255,7 @@ function findDeploy(context, serverId, retries = 0) {
             return deploy;
         }
         if (++retries < MAX_RETRIES) {
-            Core.info(`No deployments found. Retrying...(${retries}/${MAX_RETRIES}) ⏱`);
+            //Core.info(`No deployments found. Retrying...(${retries}/${MAX_RETRIES}) ⏱`)
             yield wait_1.wait(5000);
             return findDeploy(context, serverId, retries);
         }
@@ -277,9 +278,10 @@ function waitForDeploy(deployment) {
         const { render } = deployment;
         switch (render === null || render === void 0 ? void 0 : render.status) {
             case 1: // Running
-                yield updateDeployment(deployment, 'in_progress');
-                Core.info(`Deployment still running... ⏱`);
-                yield wait_1.wait(1000);
+                if (yield updateDeployment(deployment, 'in_progress')) {
+                    Core.info(`Deployment still running... ⏱`);
+                }
+                yield wait_1.wait(3000);
                 return waitForDeploy(Object.assign(Object.assign({}, deployment), { render: yield getDeploy(render.id) }));
             case 2: // Live
             case 3: // Succeeded
@@ -309,7 +311,9 @@ function updateDeployment({ render, github }, state) {
         if (github.state !== state) {
             yield octokit.repos.createDeploymentStatus(Object.assign(Object.assign({}, Github.context.repo), { deployment_id: github.id, log_url: `https://dashboard.render.com/web/${render.server.id}/deploys/${render.id}`, environment_url: render.server.url, description: state, state }));
             github.state = state;
+            return true;
         }
+        return false;
     });
 }
 /*******************************************

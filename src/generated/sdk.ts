@@ -448,7 +448,8 @@ export enum DatabaseStatus {
   Creating = 'CREATING',
   Available = 'AVAILABLE',
   Unavailable = 'UNAVAILABLE',
-  Suspended = 'SUSPENDED'
+  Suspended = 'SUSPENDED',
+  Unknown = 'UNKNOWN'
 }
 
 export enum DatabaseType {
@@ -952,7 +953,9 @@ export type Mutation = {
   removeSlackAuth: Owner;
   removeUserFromTeam: Scalars['Boolean'];
   removeUserGithub?: Maybe<User>;
+  requestEmailReset: Scalars['Boolean'];
   resendEmailVerificationEmail?: Maybe<User>;
+  resetEmail?: Maybe<User>;
   resetPassword: Scalars['Boolean'];
   restoreDiskSnapshot: Server;
   resumeDatabase: Database;
@@ -1291,9 +1294,19 @@ export type MutationRemoveUserFromTeamArgs = {
 };
 
 
+export type MutationRequestEmailResetArgs = {
+  newEmail: Scalars['String'];
+};
+
+
 export type MutationResendEmailVerificationEmailArgs = {
   userId: Scalars['String'];
   next?: Maybe<Scalars['String']>;
+};
+
+
+export type MutationResetEmailArgs = {
+  token: Scalars['String'];
 };
 
 
@@ -2206,6 +2219,8 @@ export type SampleValue = {
   cpu?: Maybe<Scalars['Int']>;
   cpuAvgPerMille?: Maybe<Scalars['Int']>;
   instances?: Maybe<Scalars['Int']>;
+  storageAvailableBytes?: Maybe<Scalars['Int']>;
+  storageUsedBytes?: Maybe<Scalars['Int']>;
 };
 
 export type Server = Service & {

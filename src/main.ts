@@ -30,7 +30,7 @@ type DeploymentState =
 /*******************************************
  *** Constants
  ******************************************/
-const MAX_RETRIES = 10
+const MAX_RETRIES = 20
 
 /*******************************************
  *** Globals
@@ -99,7 +99,7 @@ async function findDeploy(
   serverId: string,
   retries = 0
 ): Promise<RenderDeploy> {
-  Core.info(`Listing deployments for ${serverId}...`)
+  Core.info(`Looking deployments for ${serverId}...`)
   const {deploys} = await sdk.Deploys({serverId})
   const deploy = deploys?.find(
     d =>
@@ -110,7 +110,7 @@ async function findDeploy(
     return deploy
   }
   if (++retries < MAX_RETRIES) {
-    Core.info(`No deployments found. Retrying...(${retries}/${MAX_RETRIES}) ⏱`)
+    //Core.info(`No deployments found. Retrying...(${retries}/${MAX_RETRIES}) ⏱`)
     await wait(5000)
     return findDeploy(context, serverId, retries)
   } else {
@@ -130,9 +130,10 @@ async function waitForDeploy(deployment: Deployment): Promise<void> {
   const {render} = deployment
   switch (render?.status) {
     case 1: // Running
-      await updateDeployment(deployment, 'in_progress')
-      Core.info(`Deployment still running... ⏱`)
-      await wait(1000)
+      if (await updateDeployment(deployment, 'in_progress')) {
+        Core.info(`Deployment still running... ⏱`)
+      }
+      await wait(3000)
       return waitForDeploy({...deployment, render: await getDeploy(render.id)})
     case 2: // Live
     case 3: // Succeeded
@@ -172,7 +173,7 @@ async function createDeployment(
 async function updateDeployment(
   {render, github}: Deployment,
   state: DeploymentState
-): Promise<void> {
+): Promise<boolean> {
   if (github.state !== state) {
     await octokit.repos.createDeploymentStatus({
       ...Github.context.repo,
@@ -183,7 +184,9 @@ async function updateDeployment(
       state
     })
     github.state = state
+    return true
   }
+  return false
 }
 
 /*******************************************
