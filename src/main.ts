@@ -68,7 +68,7 @@ async function findServer({pr}: Context): Promise<string> {
       s => s?.pullRequest.number === number
     )
 
-    if (server) {
+    if (server && server.server) {
       return server.server.id
     }
     Core.info('No Pull Request Servers found. Using regular deployment')
@@ -137,6 +137,7 @@ async function waitForDeploy(deployment: Deployment): Promise<void> {
       return waitForDeploy({...deployment, render: await getDeploy(render.id)})
     case 2: // Live
     case 3: // Succeeded
+      await wait(~~Core.getInput('sleep'))
       await updateDeployment(deployment, 'success')
       Core.info(`Deployment ${render.id} succeeded ✅`)
       return
@@ -160,7 +161,7 @@ async function createDeployment(
     ...Github.context.repo,
     ref: context.ref,
     description: server.name,
-    environment: `${context.pr ? 'Preview' : 'Production'} - ${server.name}`,
+    environment: `${context.pr ? 'Preview' : 'Production'} – ${server.name}`,
     production_environment: !context.pr,
     transient_environment: !!context.pr,
     auto_merge: false,

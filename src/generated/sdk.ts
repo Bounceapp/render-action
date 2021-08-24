@@ -26,20 +26,6 @@ export type ApiToken = {
   token?: Maybe<Scalars['String']>;
 };
 
-export enum AddonProduct {
-  Logdna = 'LOGDNA',
-  Scout = 'SCOUT'
-}
-
-export type AddonResource = {
-  __typename?: 'AddonResource';
-  id: Scalars['String'];
-  ownerId: Scalars['String'];
-  createdAt: Scalars['Time'];
-  updatedAt: Scalars['Time'];
-  product: AddonProduct;
-};
-
 export type AuthResult = {
   __typename?: 'AuthResult';
   idToken?: Maybe<Scalars['String']>;
@@ -79,9 +65,9 @@ export type AutoscalingInput = {
   min: Scalars['Int'];
   max: Scalars['Int'];
   cpuPercentage: Scalars['Int'];
-  cpuEnabled?: Maybe<Scalars['Boolean']>;
-  memoryPercentage?: Maybe<Scalars['Int']>;
-  memoryEnabled?: Maybe<Scalars['Boolean']>;
+  cpuEnabled: Scalars['Boolean'];
+  memoryPercentage: Scalars['Int'];
+  memoryEnabled: Scalars['Boolean'];
 };
 
 export type AutoscalingStarted = ServiceEvent & {
@@ -150,6 +136,18 @@ export type BillingInfoInput = {
   postalCode: Scalars['String'];
   vatNumber: Scalars['String'];
 };
+
+export type BillingInfoOutput = {
+  __typename?: 'BillingInfoOutput';
+  owner?: Maybe<Owner>;
+  response: BillingInfoResponse;
+};
+
+export enum BillingInfoResponse {
+  Success = 'SUCCESS',
+  AddressFailed = 'ADDRESS_FAILED',
+  VatFailed = 'VAT_FAILED'
+}
 
 export type BranchDeleted = ServiceEvent & {
   __typename?: 'BranchDeleted';
@@ -231,6 +229,7 @@ export type Certificate = {
   id: Scalars['String'];
   domain: Scalars['String'];
   issued: Scalars['Boolean'];
+  errors?: Maybe<Scalars['JSON']>;
 };
 
 export type Charge = {
@@ -268,6 +267,15 @@ export type CidrBlockAndDescription = {
 export type CidrBlockAndDescriptionInput = {
   cidrBlock: Scalars['String'];
   description?: Maybe<Scalars['String']>;
+};
+
+export type CommitIgnored = ServiceEvent & {
+  __typename?: 'CommitIgnored';
+  id: Scalars['String'];
+  timestamp: Scalars['Time'];
+  service: Service;
+  commit: Scalars['String'];
+  commitUrl: Scalars['String'];
 };
 
 export type CronJob = Service & {
@@ -388,7 +396,7 @@ export type Database = {
   databaseUser: Scalars['String'];
   isMaxPlan: Scalars['Boolean'];
   maintenanceScheduledAt?: Maybe<Scalars['Time']>;
-  metrics: Metrics;
+  metrics: DatabaseMetrics;
   name: Scalars['String'];
   owner: Owner;
   password?: Maybe<Scalars['String']>;
@@ -410,6 +418,7 @@ export type Database = {
   storageUsedPercent?: Maybe<Scalars['String']>;
   suspenders: Array<Scalars['String']>;
   type: DatabaseType;
+  postgresMajorVersion?: Maybe<Scalars['String']>;
 };
 
 
@@ -432,6 +441,11 @@ export type DatabaseInput = {
   version: Scalars['String'];
 };
 
+export type DatabaseMetrics = {
+  __typename?: 'DatabaseMetrics';
+  samples: Array<DatabaseSampleValue>;
+};
+
 export type DatabaseReplicaInput = {
   clusterID: Scalars['String'];
   name: Scalars['String'];
@@ -443,6 +457,17 @@ export enum DatabaseRole {
   Primary = 'PRIMARY',
   Replica = 'REPLICA'
 }
+
+export type DatabaseSampleValue = {
+  __typename?: 'DatabaseSampleValue';
+  time: Scalars['Time'];
+  memory?: Maybe<Scalars['Float']>;
+  cpu?: Maybe<Scalars['Int']>;
+  storageAvailableBytes?: Maybe<Scalars['Int']>;
+  storageUsedBytes?: Maybe<Scalars['Int']>;
+  activeConnections?: Maybe<Scalars['Int']>;
+  replicationLag?: Maybe<Scalars['Int']>;
+};
 
 export enum DatabaseStatus {
   Creating = 'CREATING',
@@ -623,6 +648,7 @@ export type FailureReason = {
   nonZeroExit?: Maybe<Scalars['Int']>;
   oomKilled?: Maybe<OomKilledData>;
   timedOutSeconds?: Maybe<Scalars['Int']>;
+  unhealthy?: Maybe<Scalars['String']>;
 };
 
 export type GitBranch = {
@@ -847,6 +873,7 @@ export type Invoice = {
   endDate?: Maybe<Scalars['Time']>;
   invoiceItems: Array<InvoiceItem>;
   billingInfo?: Maybe<BillingInfo>;
+  pdfLink: Scalars['String'];
 };
 
 export type InvoiceItem = {
@@ -879,10 +906,28 @@ export type Invoices = {
 };
 
 
+export type Job = {
+  __typename?: 'Job';
+  id: Scalars['String'];
+  serviceId: Scalars['String'];
+  startCommand: Scalars['String'];
+  planId: Scalars['String'];
+  createdAt: Scalars['Time'];
+  startedAt?: Maybe<Scalars['Time']>;
+  finishedAt?: Maybe<Scalars['Time']>;
+  status?: Maybe<JobStatus>;
+};
+
+export enum JobStatus {
+  Failed = 'FAILED',
+  Succeeded = 'SUCCEEDED'
+}
+
 export type LogEndpointInfo = {
   __typename?: 'LogEndpointInfo';
   endpoint?: Maybe<Scalars['String']>;
   token?: Maybe<Scalars['String']>;
+  updatedAt?: Maybe<Scalars['Time']>;
 };
 
 export type LogEntry = {
@@ -915,6 +960,7 @@ export type Mutation = {
   createCustomDomain?: Maybe<CustomDomain>;
   createCustomDomains?: Maybe<Array<CustomDomain>>;
   createDatabase?: Maybe<Database>;
+  createDatabaseBackup: Scalars['Boolean'];
   createDatabaseReplica?: Maybe<Database>;
   createDatabaseV2?: Maybe<DatabaseV2>;
   createEnvGroup?: Maybe<EnvGroup>;
@@ -940,11 +986,12 @@ export type Mutation = {
   inviteAndShare: Array<PendingPermission>;
   inviteToTeam?: Maybe<PendingUser>;
   inviteUser: Scalars['Boolean'];
-  manifoldAuthToken: Scalars['String'];
+  markTOSAccepted?: Maybe<User>;
   new2FABackupCodes: Array<TwoFactorBackupCode>;
   newOTPRequest?: Maybe<OtpRequest>;
   passwordResetConfirm?: Maybe<AuthResult>;
   performMaintenance: Database;
+  performServerMaintenance: Server;
   planIACSync?: Maybe<IacExecutionAndSource>;
   provisionAPIToken?: Maybe<ApiToken>;
   refreshCustomDomainStatus: Scalars['Boolean'];
@@ -978,6 +1025,7 @@ export type Mutation = {
   unsubscribeForever: Scalars['Boolean'];
   updateAPIToken?: Maybe<ApiToken>;
   updateBillingInfo?: Maybe<Owner>;
+  updateBillingInfoWithResult?: Maybe<BillingInfoOutput>;
   updateCard?: Maybe<Owner>;
   updateCronJobAutoDeploy?: Maybe<CronJob>;
   updateCronJobBaseDir?: Maybe<CronJob>;
@@ -1019,7 +1067,7 @@ export type Mutation = {
   updateUserNotifyOnPrUpdate?: Maybe<User>;
   updateUserProfile?: Maybe<User>;
   verifyEmail?: Maybe<AuthResult>;
-  verifyOTP?: Maybe<AuthResult>;
+  verifyOneTimePassword?: Maybe<AuthResult>;
   verifyOTPRequest: Scalars['Boolean'];
 };
 
@@ -1088,6 +1136,11 @@ export type MutationCreateCustomDomainsArgs = {
 
 export type MutationCreateDatabaseArgs = {
   database: DatabaseInput;
+};
+
+
+export type MutationCreateDatabaseBackupArgs = {
+  id: Scalars['String'];
 };
 
 
@@ -1246,6 +1299,12 @@ export type MutationPasswordResetConfirmArgs = {
 
 export type MutationPerformMaintenanceArgs = {
   databaseID: Scalars['String'];
+  at?: Maybe<Scalars['Time']>;
+};
+
+
+export type MutationPerformServerMaintenanceArgs = {
+  serverID: Scalars['String'];
   at?: Maybe<Scalars['Time']>;
 };
 
@@ -1427,6 +1486,11 @@ export type MutationUpdateApiTokenArgs = {
 
 
 export type MutationUpdateBillingInfoArgs = {
+  info: BillingInfoInput;
+};
+
+
+export type MutationUpdateBillingInfoWithResultArgs = {
   info: BillingInfoInput;
 };
 
@@ -1683,8 +1747,7 @@ export type MutationVerifyEmailArgs = {
 };
 
 
-export type MutationVerifyOtpArgs = {
-  userId: Scalars['String'];
+export type MutationVerifyOneTimePasswordArgs = {
   code: Scalars['String'];
 };
 
@@ -1805,13 +1868,13 @@ export type PullRequest = {
 
 export type PullRequestServer = {
   __typename?: 'PullRequestServer';
-  server: Server;
+  server?: Maybe<Server>;
   pullRequest: PullRequest;
+  executionSourceID?: Maybe<Scalars['String']>;
 };
 
 export type Query = {
   __typename?: 'Query';
-  addon: Array<AddonResource>;
   initialDeployHookLogs: Array<LogEntry>;
   allEnvs: Array<Env>;
   allRegions: Array<Region>;
@@ -1846,6 +1909,7 @@ export type Query = {
   iacExecutionSources?: Maybe<Array<IacExecutionSource>>;
   invoice?: Maybe<Invoice>;
   invoicesForOwner: Invoices;
+  jobs?: Maybe<Array<Maybe<Job>>>;
   newPaidServiceAllowed: Scalars['Boolean'];
   owner?: Maybe<Owner>;
   pullRequestServers?: Maybe<Array<Maybe<PullRequestServer>>>;
@@ -1870,12 +1934,6 @@ export type Query = {
   userRepoList: Array<GitRepo>;
   validatePasswordResetToken: Scalars['String'];
   serviceEvents: ServiceEventsResult;
-};
-
-
-export type QueryAddonArgs = {
-  ownerId: Scalars['String'];
-  product: AddonProduct;
 };
 
 
@@ -2032,6 +2090,11 @@ export type QueryInvoiceArgs = {
 export type QueryInvoicesForOwnerArgs = {
   ownerId: Scalars['String'];
   cursor?: Maybe<Scalars['Int']>;
+};
+
+
+export type QueryJobsArgs = {
+  serverId: Scalars['String'];
 };
 
 
@@ -2219,8 +2282,6 @@ export type SampleValue = {
   cpu?: Maybe<Scalars['Int']>;
   cpuAvgPerMille?: Maybe<Scalars['Int']>;
   instances?: Maybe<Scalars['Int']>;
-  storageAvailableBytes?: Maybe<Scalars['Int']>;
-  storageUsedBytes?: Maybe<Scalars['Int']>;
 };
 
 export type Server = Service & {
@@ -2244,12 +2305,14 @@ export type Server = Service & {
   healthCheckPath: Scalars['String'];
   isPrivate?: Maybe<Scalars['Boolean']>;
   isWorker: Scalars['Boolean'];
+  maintenanceScheduledAt?: Maybe<Scalars['Time']>;
   metrics: Metrics;
   name: Scalars['String'];
   notifyOnFail: Setting;
   openPorts?: Maybe<Scalars['JSON']>;
   owner: Owner;
   parentServer?: Maybe<Server>;
+  pendingMaintenanceBy?: Maybe<Scalars['Time']>;
   pendingPermissions: Array<PendingPermission>;
   plan: Plan;
   prPreviewsEnabled: Scalars['Boolean'];
@@ -2613,6 +2676,8 @@ export type User = {
   notifyOnPrUpdate: Setting;
   otpEnabled: Scalars['Boolean'];
   passwordExists: Scalars['Boolean'];
+  tosAcceptedAt: Scalars['Time'];
+  intercomHMAC?: Maybe<Scalars['String']>;
 };
 
 export enum UserFacingTypeSlug {
@@ -2625,6 +2690,14 @@ export enum UserFacingTypeSlug {
 
 export type UserProfileInput = {
   name: Scalars['String'];
+};
+
+export type UserServerUnhealthy = ServiceEvent & {
+  __typename?: 'UserServerUnhealthy';
+  id: Scalars['String'];
+  timestamp: Scalars['Time'];
+  service: Service;
+  message: Scalars['String'];
 };
 
 export type DeployQueryVariables = Exact<{
@@ -2673,10 +2746,10 @@ export type PullRequestServersQuery = (
     & { pullRequest: (
       { __typename?: 'PullRequest' }
       & Pick<PullRequest, 'number'>
-    ), server: (
+    ), server?: Maybe<(
       { __typename?: 'Server' }
       & Pick<Server, 'id'>
-    ) }
+    )> }
   )>>> }
 );
 

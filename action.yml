@@ -14,6 +14,10 @@ inputs:
   token:
     required: true
     description: GitHub token
+  sleep:
+    required: false
+    description: Sleep time between the render deployment success and setting the Github deployment as successful
+    default: '0'
 runs:
   using: node12
   main: dist/index.js

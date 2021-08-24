@@ -11,18 +11,19 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getSdk = exports.SignInDocument = exports.PullRequestServersDocument = exports.DeploysDocument = exports.DeployDocument = exports.UserFacingTypeSlug = exports.Setting = exports.RollbackSupportStatus = exports.IacExecutionState = exports.IacExecutionSourceStatus = exports.GitProvider = exports.DatabaseType = exports.DatabaseStatus = exports.DatabaseRole = exports.BackupStatus = exports.AddonProduct = void 0;
+exports.getSdk = exports.SignInDocument = exports.PullRequestServersDocument = exports.DeploysDocument = exports.DeployDocument = exports.UserFacingTypeSlug = exports.Setting = exports.RollbackSupportStatus = exports.JobStatus = exports.IacExecutionState = exports.IacExecutionSourceStatus = exports.GitProvider = exports.DatabaseType = exports.DatabaseStatus = exports.DatabaseRole = exports.BillingInfoResponse = exports.BackupStatus = void 0;
 const graphql_tag_1 = __importDefault(__webpack_require__(8377));
-var AddonProduct;
-(function (AddonProduct) {
-    AddonProduct["Logdna"] = "LOGDNA";
-    AddonProduct["Scout"] = "SCOUT";
-})(AddonProduct = exports.AddonProduct || (exports.AddonProduct = {}));
 var BackupStatus;
 (function (BackupStatus) {
     BackupStatus["InProgress"] = "IN_PROGRESS";
     BackupStatus["Done"] = "DONE";
 })(BackupStatus = exports.BackupStatus || (exports.BackupStatus = {}));
+var BillingInfoResponse;
+(function (BillingInfoResponse) {
+    BillingInfoResponse["Success"] = "SUCCESS";
+    BillingInfoResponse["AddressFailed"] = "ADDRESS_FAILED";
+    BillingInfoResponse["VatFailed"] = "VAT_FAILED";
+})(BillingInfoResponse = exports.BillingInfoResponse || (exports.BillingInfoResponse = {}));
 var DatabaseRole;
 (function (DatabaseRole) {
     DatabaseRole["Primary"] = "PRIMARY";
@@ -61,6 +62,11 @@ var IacExecutionState;
     IacExecutionState["Error"] = "ERROR";
     IacExecutionState["Success"] = "SUCCESS";
 })(IacExecutionState = exports.IacExecutionState || (exports.IacExecutionState = {}));
+var JobStatus;
+(function (JobStatus) {
+    JobStatus["Failed"] = "FAILED";
+    JobStatus["Succeeded"] = "SUCCEEDED";
+})(JobStatus = exports.JobStatus || (exports.JobStatus = {}));
 var RollbackSupportStatus;
 (function (RollbackSupportStatus) {
     RollbackSupportStatus["RollbackSupportUnknown"] = "ROLLBACK_SUPPORT_UNKNOWN";
@@ -225,7 +231,7 @@ function findServer({ pr }) {
             const number = pr.toString();
             const { pullRequestServers } = yield sdk.PullRequestServers({ serverId });
             const server = pullRequestServers === null || pullRequestServers === void 0 ? void 0 : pullRequestServers.find(s => (s === null || s === void 0 ? void 0 : s.pullRequest.number) === number);
-            if (server) {
+            if (server && server.server) {
                 return server.server.id;
             }
             Core.info('No Pull Request Servers found. Using regular deployment');
@@ -285,6 +291,7 @@ function waitForDeploy(deployment) {
                 return waitForDeploy(Object.assign(Object.assign({}, deployment), { render: yield getDeploy(render.id) }));
             case 2: // Live
             case 3: // Succeeded
+                yield wait_1.wait(~~Core.getInput('sleep'));
                 yield updateDeployment(deployment, 'success');
                 Core.info(`Deployment ${render.id} succeeded ✅`);
                 return;
@@ -302,7 +309,7 @@ function createDeployment(context, { server }) {
     return __awaiter(this, void 0, void 0, function* () {
         Core.info(`Creating ${server.name} GitHub deployment`);
         const state = 'pending';
-        const { data } = yield octokit.repos.createDeployment(Object.assign(Object.assign({}, Github.context.repo), { ref: context.ref, description: server.name, environment: `${context.pr ? 'Preview' : 'Production'} - ${server.name}`, production_environment: !context.pr, transient_environment: !!context.pr, auto_merge: false, required_contexts: [], state }));
+        const { data } = yield octokit.repos.createDeployment(Object.assign(Object.assign({}, Github.context.repo), { ref: context.ref, description: server.name, environment: `${context.pr ? 'Preview' : 'Production'} – ${server.name}`, production_environment: !context.pr, transient_environment: !!context.pr, auto_merge: false, required_contexts: [], state }));
         return Object.assign(Object.assign({}, data), { state });
     });
 }
