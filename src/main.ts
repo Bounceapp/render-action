@@ -28,11 +28,6 @@ type DeploymentState =
   | 'success'
 
 /*******************************************
- *** Constants
- ******************************************/
-const MAX_RETRIES = 20
-
-/*******************************************
  *** Globals
  ******************************************/
 const client = new GraphQLClient('https://api.render.com/graphql')
@@ -106,11 +101,10 @@ async function findDeploy(
       d.commitId === context.sha &&
       d.branch === context.ref.replace('refs/heads/', '')
   ) as RenderDeploy
-  if (deploy) {
-    return deploy
-  }
-  if (++retries < MAX_RETRIES) {
-    //Core.info(`No deployments found. Retrying...(${retries}/${MAX_RETRIES}) ⏱`)
+  if (deploy) return deploy
+  const max_retries = ~~Core.getInput('retries')
+  if (++retries < max_retries) {
+    Core.info(`No deployments found. Retrying...(${retries}/${max_retries}) ⏱`)
     await wait(5000)
     return findDeploy(context, serverId, retries)
   } else {
@@ -143,7 +137,10 @@ async function waitForDeploy(deployment: Deployment): Promise<void> {
       return
     case 4: // Failed
       await updateDeployment(deployment, 'failure')
-      throw new Error(`Deployment ${render.id} failed! ❌`)
+
+      throw new Error(
+        `Deployment ${render.id} failed! ❌ (${getDeployUrl(render)})`
+      )
     case 5: // Cancelled
       await updateDeployment(deployment, 'inactive')
       Core.info(`Deployment ${render.id} canceled ⏹`)
@@ -179,7 +176,7 @@ async function updateDeployment(
     await octokit.repos.createDeploymentStatus({
       ...Github.context.repo,
       deployment_id: github.id,
-      log_url: `https://dashboard.render.com/web/${render.server.id}/deploys/${render.id}`,
+      log_url: getDeployUrl(render),
       environment_url: render.server.url,
       description: state,
       state
@@ -188,6 +185,10 @@ async function updateDeployment(
     return true
   }
   return false
+}
+
+function getDeployUrl(deploy: RenderDeploy): string {
+  return `https://dashboard.render.com/web/${deploy.server.id}/deploys/${deploy.id}`
 }
 
 /*******************************************

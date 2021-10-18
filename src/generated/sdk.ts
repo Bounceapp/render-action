@@ -292,10 +292,13 @@ export type CronJob = Service & {
   dockerfilePath?: Maybe<Scalars['String']>;
   env: Env;
   lastSuccessfulRunAt?: Maybe<Scalars['Time']>;
+  lastDeployedAt?: Maybe<Scalars['Time']>;
+  maintenanceScheduledAt?: Maybe<Scalars['Time']>;
   metrics: Metrics;
   name: Scalars['String'];
   notifyOnFail: Setting;
   owner: Owner;
+  pendingMaintenanceBy?: Maybe<Scalars['Time']>;
   pendingPermissions: Array<PendingPermission>;
   plan: Plan;
   referentPermissions: Array<Permission>;
@@ -305,6 +308,7 @@ export type CronJob = Service & {
   slug: Scalars['String'];
   sourceBranch: Scalars['String'];
   state: Scalars['String'];
+  status?: Maybe<StatusResponse>;
   suspenders: Array<Scalars['String']>;
   type: Scalars['String'];
   updatedAt: Scalars['Time'];
@@ -334,6 +338,7 @@ export type CronJobInput = {
   region?: Maybe<Scalars['String']>;
   repo: RepoInput;
   schedule: Scalars['String'];
+  plan?: Maybe<Scalars['String']>;
 };
 
 export type CronJobRun = {
@@ -369,6 +374,13 @@ export type CronJobRunStarted = ServiceEvent & {
   triggeredByUser?: Maybe<User>;
 };
 
+export type CurrentMonthFreeTierUsageByService = {
+  __typename?: 'CurrentMonthFreeTierUsageByService';
+  serviceName: Scalars['String'];
+  serviceId: Scalars['String'];
+  usageMinutes: Scalars['Int'];
+};
+
 export type CustomDomain = {
   __typename?: 'CustomDomain';
   id: Scalars['String'];
@@ -385,6 +397,22 @@ export type CustomDomainInput = {
   serverId: Scalars['String'];
 };
 
+export type CustomerInfo = {
+  __typename?: 'CustomerInfo';
+  id: Scalars['String'];
+  name: Scalars['String'];
+  address: Scalars['String'];
+  city: Scalars['String'];
+  region: Scalars['String'];
+  country: Scalars['String'];
+  postalCode: Scalars['String'];
+  vatNumber: Scalars['String'];
+  balance: Scalars['Int'];
+  cardBrand: Scalars['String'];
+  cardLast4: Scalars['String'];
+  promotions: Array<Promotion>;
+};
+
 export type Database = {
   __typename?: 'Database';
   id: Scalars['String'];
@@ -392,6 +420,8 @@ export type Database = {
   backups?: Maybe<BackupPage>;
   canBill: Scalars['Boolean'];
   createdAt: Scalars['Time'];
+  updatedAt: Scalars['Time'];
+  expiresAt?: Maybe<Scalars['Time']>;
   databaseName: Scalars['String'];
   databaseUser: Scalars['String'];
   isMaxPlan: Scalars['Boolean'];
@@ -478,7 +508,8 @@ export enum DatabaseStatus {
 }
 
 export enum DatabaseType {
-  Postgresql = 'POSTGRESQL'
+  Postgresql = 'POSTGRESQL',
+  Redis = 'REDIS'
 }
 
 export type DatabaseV2 = {
@@ -651,6 +682,28 @@ export type FailureReason = {
   unhealthy?: Maybe<Scalars['String']>;
 };
 
+export type FreeTierUsageByDay = {
+  __typename?: 'FreeTierUsageByDay';
+  usageDate: Scalars['Time'];
+  usageMinutes: Scalars['Int'];
+};
+
+export type FreeTierUsageByOwner = {
+  __typename?: 'FreeTierUsageByOwner';
+  currentMonthUsageMinutes: Scalars['Int'];
+  currentMonthTotalAllowedMinutes: Scalars['Int'];
+  averageUsagePerDayMinutes: Scalars['Float'];
+  currentMonthUsageByService: Array<CurrentMonthFreeTierUsageByService>;
+  thirtyOneDayUsageHistory: Array<FreeTierUsageByDay>;
+};
+
+export type FreeTierUsageByService = {
+  __typename?: 'FreeTierUsageByService';
+  currentMonthUsageMinutes: Scalars['Int'];
+  averageUsagePerDayMinutes: Scalars['Float'];
+  thirtyOneDayUsageHistory: Array<FreeTierUsageByDay>;
+};
+
 export type GitBranch = {
   __typename?: 'GitBranch';
   name: Scalars['String'];
@@ -758,7 +811,6 @@ export type Header = {
 };
 
 export type HeaderInput = {
-  id?: Maybe<Scalars['String']>;
   path: Scalars['String'];
   key: Scalars['String'];
   value: Scalars['String'];
@@ -873,6 +925,7 @@ export type Invoice = {
   endDate?: Maybe<Scalars['Time']>;
   invoiceItems: Array<InvoiceItem>;
   billingInfo?: Maybe<BillingInfo>;
+  hostedInvoice?: Maybe<Scalars['String']>;
   pdfLink: Scalars['String'];
 };
 
@@ -940,6 +993,28 @@ export type LogEntry = {
   text: Scalars['String'];
 };
 
+export type MaintenanceEnded = ServiceEvent & {
+  __typename?: 'MaintenanceEnded';
+  id: Scalars['String'];
+  service: Service;
+  timestamp: Scalars['Time'];
+};
+
+export type MaintenanceStarted = ServiceEvent & {
+  __typename?: 'MaintenanceStarted';
+  id: Scalars['String'];
+  service: Service;
+  timestamp: Scalars['Time'];
+  trigger?: Maybe<MaintenanceTrigger>;
+};
+
+export type MaintenanceTrigger = {
+  __typename?: 'MaintenanceTrigger';
+  manual?: Maybe<Scalars['Boolean']>;
+  system?: Maybe<Scalars['Boolean']>;
+  user?: Maybe<User>;
+};
+
 export type Metrics = {
   __typename?: 'Metrics';
   samples: Array<SampleValue>;
@@ -951,6 +1026,8 @@ export type Mutation = {
   addEnvGroupToService?: Maybe<EnvGroup>;
   addFeatureFlagToUser?: Maybe<User>;
   addUserToTeam?: Maybe<User>;
+  addPromotion: Promotion;
+  addPromotionWithOwner: Promotion;
   adminLoginAs?: Maybe<AuthResult>;
   approveIACSync?: Maybe<IacExecutionAndSource>;
   buildCronJob?: Maybe<Build>;
@@ -965,7 +1042,9 @@ export type Mutation = {
   createDatabaseV2?: Maybe<DatabaseV2>;
   createEnvGroup?: Maybe<EnvGroup>;
   createPassword?: Maybe<AuthResult>;
+  createRedis?: Maybe<Redis>;
   createServer?: Maybe<Server>;
+  createSSHPublicKey: SshPublicKey;
   createTeam?: Maybe<Team>;
   deleteCronJob: Scalars['Boolean'];
   deleteCustomDomain: Scalars['Boolean'];
@@ -973,7 +1052,9 @@ export type Mutation = {
   deleteDisk: Server;
   deleteEnvGroup: Scalars['Boolean'];
   deleteIACExecutionSource: Scalars['Boolean'];
+  deleteRedis: Scalars['Boolean'];
   deleteServer: Scalars['Boolean'];
+  deleteSSHPublicKey: SshPublicKey;
   deleteTeam: Scalars['Boolean'];
   deleteUserAccount: Scalars['Boolean'];
   deployServer?: Maybe<Deploy>;
@@ -982,7 +1063,9 @@ export type Mutation = {
   gitlabAuth?: Maybe<GitlabAuthResult>;
   gitlabConnect: Scalars['Boolean'];
   googleAuth?: Maybe<GoogleAuthResult>;
+  grantPermissionsOrInvite: PermissionWithStatus;
   grantPermissions: Array<Permission>;
+  /** deprecated */
   inviteAndShare: Array<PendingPermission>;
   inviteToTeam?: Maybe<PendingUser>;
   inviteUser: Scalars['Boolean'];
@@ -996,6 +1079,7 @@ export type Mutation = {
   provisionAPIToken?: Maybe<ApiToken>;
   refreshCustomDomainStatus: Scalars['Boolean'];
   removeEnvGroupFromService: Scalars['Boolean'];
+  removeFeatureFlagFromUser?: Maybe<User>;
   removePendingUserFromTeam: Scalars['Boolean'];
   removeSlackAuth: Owner;
   removeUserFromTeam: Scalars['Boolean'];
@@ -1021,10 +1105,10 @@ export type Mutation = {
   slackAuth: Owner;
   startShell: Scalars['Boolean'];
   suspendDatabase: Database;
+  suspendRedis: Redis;
   suspendService: Service;
   unsubscribeForever: Scalars['Boolean'];
   updateAPIToken?: Maybe<ApiToken>;
-  updateBillingInfo?: Maybe<Owner>;
   updateBillingInfoWithResult?: Maybe<BillingInfoOutput>;
   updateCard?: Maybe<Owner>;
   updateCronJobAutoDeploy?: Maybe<CronJob>;
@@ -1035,6 +1119,7 @@ export type Mutation = {
   updateCronJobDockerCommand?: Maybe<CronJob>;
   updateCronJobDockerfilePath?: Maybe<CronJob>;
   updateCronJobName?: Maybe<CronJob>;
+  updateCronJobPlan?: Maybe<CronJob>;
   updateCronJobSchedule?: Maybe<CronJob>;
   updateDatabaseDisplayName?: Maybe<Database>;
   updateDatabaseIpAllowList?: Maybe<Database>;
@@ -1047,6 +1132,7 @@ export type Mutation = {
   updateIacSourceName: IacExecutionSource;
   updateOwnerNotificationSetting?: Maybe<Owner>;
   updateOwnerLogEndpoint?: Maybe<Owner>;
+  updatePassword?: Maybe<AuthResult>;
   updateServerAutoDeploy?: Maybe<Server>;
   updateServerAutoscalingConfig?: Maybe<Server>;
   updateServerBaseDir?: Maybe<Server>;
@@ -1092,6 +1178,18 @@ export type MutationAddFeatureFlagToUserArgs = {
 export type MutationAddUserToTeamArgs = {
   teamId: Scalars['String'];
   userId: Scalars['String'];
+};
+
+
+export type MutationAddPromotionArgs = {
+  ownerId: Scalars['String'];
+  promotionCode: Scalars['String'];
+};
+
+
+export type MutationAddPromotionWithOwnerArgs = {
+  ownerId: Scalars['String'];
+  promotionCode: Scalars['String'];
 };
 
 
@@ -1166,8 +1264,18 @@ export type MutationCreatePasswordArgs = {
 };
 
 
+export type MutationCreateRedisArgs = {
+  redis: RedisInput;
+};
+
+
 export type MutationCreateServerArgs = {
   server: ServerInput;
+};
+
+
+export type MutationCreateSshPublicKeyArgs = {
+  publicKey: Scalars['String'];
 };
 
 
@@ -1206,8 +1314,18 @@ export type MutationDeleteIacExecutionSourceArgs = {
 };
 
 
+export type MutationDeleteRedisArgs = {
+  id: Scalars['String'];
+};
+
+
 export type MutationDeleteServerArgs = {
   id: Scalars['String'];
+};
+
+
+export type MutationDeleteSshPublicKeyArgs = {
+  publicKeyID: Scalars['String'];
 };
 
 
@@ -1253,6 +1371,13 @@ export type MutationGitlabConnectArgs = {
 
 export type MutationGoogleAuthArgs = {
   token: Scalars['String'];
+};
+
+
+export type MutationGrantPermissionsOrInviteArgs = {
+  email: Scalars['String'];
+  action: Scalars['String'];
+  serviceId: Scalars['String'];
 };
 
 
@@ -1333,6 +1458,11 @@ export type MutationRefreshCustomDomainStatusArgs = {
 export type MutationRemoveEnvGroupFromServiceArgs = {
   serviceId: Scalars['String'];
   envGroupId: Scalars['String'];
+};
+
+
+export type MutationRemoveFeatureFlagFromUserArgs = {
+  featureFlag: Scalars['String'];
 };
 
 
@@ -1469,6 +1599,11 @@ export type MutationSuspendDatabaseArgs = {
 };
 
 
+export type MutationSuspendRedisArgs = {
+  id: Scalars['String'];
+};
+
+
 export type MutationSuspendServiceArgs = {
   id: Scalars['String'];
 };
@@ -1482,11 +1617,6 @@ export type MutationUnsubscribeForeverArgs = {
 export type MutationUpdateApiTokenArgs = {
   id: Scalars['String'];
   label?: Maybe<Scalars['String']>;
-};
-
-
-export type MutationUpdateBillingInfoArgs = {
-  info: BillingInfoInput;
 };
 
 
@@ -1550,6 +1680,12 @@ export type MutationUpdateCronJobDockerfilePathArgs = {
 export type MutationUpdateCronJobNameArgs = {
   id: Scalars['String'];
   name: Scalars['String'];
+};
+
+
+export type MutationUpdateCronJobPlanArgs = {
+  id: Scalars['String'];
+  plan: Scalars['String'];
 };
 
 
@@ -1625,6 +1761,12 @@ export type MutationUpdateOwnerLogEndpointArgs = {
   id: Scalars['String'];
   endpoint: Scalars['String'];
   token: Scalars['String'];
+};
+
+
+export type MutationUpdatePasswordArgs = {
+  password: Scalars['String'];
+  newPassword: Scalars['String'];
 };
 
 
@@ -1784,14 +1926,12 @@ export type Owner = {
   email: Scalars['String'];
   user?: Maybe<User>;
   team?: Maybe<Team>;
-  balance: Scalars['Int'];
   canBill: Scalars['Boolean'];
   cardBrand: Scalars['String'];
   cardLast4: Scalars['String'];
   createdAt: Scalars['Time'];
   notifyOnFail: Setting;
   slackConnected: Scalars['Boolean'];
-  billingInfo?: Maybe<BillingInfo>;
   /** Trial length in seconds */
   trialLength: Scalars['Int'];
   logEndpoint?: Maybe<LogEndpointInfo>;
@@ -1827,6 +1967,20 @@ export type PermissionInput = {
   objectId: Scalars['String'];
 };
 
+export enum PermissionStatus {
+  Pending = 'pending',
+  Granted = 'granted'
+}
+
+export type PermissionWithStatus = {
+  __typename?: 'PermissionWithStatus';
+  subjectId?: Maybe<Scalars['String']>;
+  email: Scalars['String'];
+  action: Scalars['String'];
+  object: Object;
+  status: PermissionStatus;
+};
+
 export type Plan = {
   __typename?: 'Plan';
   name: Scalars['String'];
@@ -1852,6 +2006,22 @@ export type PlanData = {
   size: Scalars['String'];
   needsPaymentInfo: Scalars['Boolean'];
 };
+
+export type Promotion = {
+  __typename?: 'Promotion';
+  id: Scalars['String'];
+  name: Scalars['String'];
+  status: PromotionStatus;
+  details: Scalars['String'];
+  valueRemaining: Scalars['String'];
+  expirationDate: Scalars['Int'];
+};
+
+export enum PromotionStatus {
+  Active = 'ACTIVE',
+  Expired = 'EXPIRED',
+  Invalid = 'INVALID'
+}
 
 export type PullRequest = {
   __typename?: 'PullRequest';
@@ -1887,13 +2057,14 @@ export type Query = {
   communalServicesForUser: Array<Service>;
   cronJob?: Maybe<CronJob>;
   cronJobRuns: Array<CronJobRun>;
+  cronJobPlans: Array<PlanData>;
   currentLiveDeploy?: Maybe<Deploy>;
   customDomains: Array<CustomDomain>;
+  customerInfo: CustomerInfo;
   database?: Maybe<Database>;
   databaseV2Options?: Maybe<DatabaseV2Options>;
   databasePlans: Array<PlanData>;
   databasesForOwner: Array<Database>;
-  databasesForUser: Array<Database>;
   deploy?: Maybe<Deploy>;
   deployLogs: Array<LogEntry>;
   deploys: Array<Deploy>;
@@ -1902,6 +2073,8 @@ export type Query = {
   envGroupsForOwner: Array<EnvGroup>;
   envGroupsForService: Array<EnvGroup>;
   envVarsForService: Array<EnvVar>;
+  freeTierUsageByOwner?: Maybe<FreeTierUsageByOwner>;
+  freeTierUsageByService?: Maybe<FreeTierUsageByService>;
   gitRepo?: Maybe<GitRepo>;
   headersForService: Array<Header>;
   iacExecution?: Maybe<IacExecution>;
@@ -1914,6 +2087,9 @@ export type Query = {
   owner?: Maybe<Owner>;
   pullRequestServers?: Maybe<Array<Maybe<PullRequestServer>>>;
   redirectRules: Array<RedirectRule>;
+  redis?: Maybe<Redis>;
+  redisPlans: Array<PlanData>;
+  redisesForOwner: Array<Redis>;
   server?: Maybe<Server>;
   serverPlans: Array<PlanData>;
   service?: Maybe<Service>;
@@ -1924,6 +2100,7 @@ export type Query = {
   servicesForOwner: Array<Service>;
   servicesForUser: Array<Service>;
   staticPlans: Array<PlanData>;
+  status?: Maybe<StatusResponse>;
   team?: Maybe<Team>;
   teamNameExistsForEmail: Scalars['Boolean'];
   teamsForUser: Array<Team>;
@@ -1991,6 +2168,11 @@ export type QueryCustomDomainsArgs = {
 };
 
 
+export type QueryCustomerInfoArgs = {
+  ownerId: Scalars['String'];
+};
+
+
 export type QueryDatabaseArgs = {
   id: Scalars['String'];
 };
@@ -2003,11 +2185,6 @@ export type QueryDatabaseV2OptionsArgs = {
 
 export type QueryDatabasesForOwnerArgs = {
   ownerId: Scalars['String'];
-};
-
-
-export type QueryDatabasesForUserArgs = {
-  userId: Scalars['String'];
 };
 
 
@@ -2051,6 +2228,16 @@ export type QueryEnvGroupsForServiceArgs = {
 export type QueryEnvVarsForServiceArgs = {
   serviceId: Scalars['String'];
   isFile: Scalars['Boolean'];
+};
+
+
+export type QueryFreeTierUsageByOwnerArgs = {
+  ownerId: Scalars['String'];
+};
+
+
+export type QueryFreeTierUsageByServiceArgs = {
+  serviceId: Scalars['String'];
 };
 
 
@@ -2118,6 +2305,16 @@ export type QueryRedirectRulesArgs = {
 };
 
 
+export type QueryRedisArgs = {
+  id: Scalars['String'];
+};
+
+
+export type QueryRedisesForOwnerArgs = {
+  ownerId: Scalars['String'];
+};
+
+
 export type QueryServerArgs = {
   id: Scalars['String'];
 };
@@ -2159,6 +2356,11 @@ export type QueryServicesForOwnerArgs = {
 
 export type QueryServicesForUserArgs = {
   userId?: Maybe<Scalars['String']>;
+};
+
+
+export type QueryStatusArgs = {
+  id: Scalars['String'];
 };
 
 
@@ -2223,17 +2425,33 @@ export type RedirectRule = {
   enabled: Scalars['Boolean'];
   httpStatus: Scalars['Int'];
   createdAt: Scalars['Time'];
-  override: Scalars['Boolean'];
   serverId: Scalars['String'];
 };
 
 export type RedirectRuleInput = {
-  id?: Maybe<Scalars['String']>;
   source: Scalars['String'];
   destination: Scalars['String'];
   enabled: Scalars['Boolean'];
-  override?: Maybe<Scalars['Boolean']>;
   httpStatus?: Maybe<Scalars['Int']>;
+};
+
+export type Redis = {
+  __typename?: 'Redis';
+  id: Scalars['String'];
+  createdAt: Scalars['Time'];
+  updatedAt: Scalars['Time'];
+  status: DatabaseStatus;
+  region: Region;
+  plan?: Maybe<Scalars['String']>;
+  name: Scalars['String'];
+  owner: Owner;
+};
+
+export type RedisInput = {
+  name: Scalars['String'];
+  ownerId: Scalars['String'];
+  plan?: Maybe<Scalars['String']>;
+  region?: Maybe<Scalars['String']>;
 };
 
 export type Region = {
@@ -2274,6 +2492,14 @@ export enum RollbackSupportStatus {
   RollbackUnsupportedDeployLive = 'ROLLBACK_UNSUPPORTED_DEPLOY_LIVE'
 }
 
+export type SshPublicKey = {
+  __typename?: 'SSHPublicKey';
+  id: Scalars['String'];
+  name: Scalars['String'];
+  createdAt: Scalars['Time'];
+  lastUsedAt?: Maybe<Scalars['Time']>;
+};
+
 export type SampleValue = {
   __typename?: 'SampleValue';
   time: Scalars['Time'];
@@ -2305,6 +2531,7 @@ export type Server = Service & {
   healthCheckPath: Scalars['String'];
   isPrivate?: Maybe<Scalars['Boolean']>;
   isWorker: Scalars['Boolean'];
+  lastDeployedAt?: Maybe<Scalars['Time']>;
   maintenanceScheduledAt?: Maybe<Scalars['Time']>;
   metrics: Metrics;
   name: Scalars['String'];
@@ -2324,6 +2551,7 @@ export type Server = Service & {
   sourceBranch: Scalars['String'];
   startCommand: Scalars['String'];
   state: Scalars['String'];
+  status?: Maybe<StatusResponse>;
   staticPublishPath: Scalars['String'];
   suspenders: Array<Scalars['String']>;
   type: Scalars['String'];
@@ -2388,10 +2616,13 @@ export type Service = {
   dockerCommand?: Maybe<Scalars['String']>;
   dockerfilePath?: Maybe<Scalars['String']>;
   env: Env;
+  lastDeployedAt?: Maybe<Scalars['Time']>;
+  maintenanceScheduledAt?: Maybe<Scalars['Time']>;
   metrics: Metrics;
   name: Scalars['String'];
   notifyOnFail: Setting;
   owner: Owner;
+  pendingMaintenanceBy?: Maybe<Scalars['Time']>;
   pendingPermissions: Array<PendingPermission>;
   plan: Plan;
   referentPermissions: Array<Permission>;
@@ -2400,6 +2631,7 @@ export type Service = {
   slug: Scalars['String'];
   sourceBranch: Scalars['String'];
   state: Scalars['String'];
+  status?: Maybe<StatusResponse>;
   suspenders: Array<Scalars['String']>;
   type: Scalars['String'];
   updatedAt: Scalars['Time'];
@@ -2480,6 +2712,38 @@ export type SignupInput = {
   next?: Maybe<Scalars['String']>;
 };
 
+export enum StatusLabel {
+  DeploySucceeded = 'DEPLOY_SUCCEEDED',
+  DeployInProgress = 'DEPLOY_IN_PROGRESS',
+  DeployFailed = 'DEPLOY_FAILED',
+  ServiceFailed = 'SERVICE_FAILED',
+  MaintenanceScheduled = 'MAINTENANCE_SCHEDULED',
+  MaintenanceInProgress = 'MAINTENANCE_IN_PROGRESS',
+  RunSucceeded = 'RUN_SUCCEEDED',
+  Running = 'RUNNING',
+  RunFailed = 'RUN_FAILED',
+  RunCancelled = 'RUN_CANCELLED',
+  Available = 'AVAILABLE',
+  Creating = 'CREATING',
+  Unavailable = 'UNAVAILABLE',
+  Unknown = 'UNKNOWN',
+  Suspended = 'SUSPENDED'
+}
+
+export type StatusResponse = {
+  __typename?: 'StatusResponse';
+  label: StatusLabel;
+  state: StatusState;
+};
+
+export enum StatusState {
+  Success = 'SUCCESS',
+  Danger = 'DANGER',
+  Warning = 'WARNING',
+  Processing = 'PROCESSING',
+  Unknown = 'UNKNOWN'
+}
+
 export type Subject = User;
 
 export type Subscription = {
@@ -2494,12 +2758,13 @@ export type Subscription = {
   deployUpdated?: Maybe<Deploy>;
   iacExecution?: Maybe<IacExecution>;
   iacExecutions?: Maybe<IacExecution>;
-  /** deprecated */
-  pullRequestServerCreated?: Maybe<PullRequestServer>;
   pullRequestServerCreatedOrDeleted?: Maybe<PullRequestServer>;
+  redis?: Maybe<Redis>;
+  redisSuspension?: Maybe<SuspensionInfo>;
   serviceLogAdded?: Maybe<LogEntry>;
   serviceSuspension?: Maybe<SuspensionInfo>;
   serviceUpdated: Service;
+  statusChanged?: Maybe<StatusResponse>;
   toast?: Maybe<Toast>;
   serviceEvents?: Maybe<ServiceEvent>;
 };
@@ -2557,13 +2822,18 @@ export type SubscriptionIacExecutionsArgs = {
 };
 
 
-export type SubscriptionPullRequestServerCreatedArgs = {
+export type SubscriptionPullRequestServerCreatedOrDeletedArgs = {
   serverId: Scalars['String'];
 };
 
 
-export type SubscriptionPullRequestServerCreatedOrDeletedArgs = {
-  serverId: Scalars['String'];
+export type SubscriptionRedisArgs = {
+  id: Scalars['String'];
+};
+
+
+export type SubscriptionRedisSuspensionArgs = {
+  id: Scalars['String'];
 };
 
 
@@ -2578,6 +2848,11 @@ export type SubscriptionServiceSuspensionArgs = {
 
 
 export type SubscriptionServiceUpdatedArgs = {
+  id: Scalars['String'];
+};
+
+
+export type SubscriptionStatusChangedArgs = {
   id: Scalars['String'];
 };
 
@@ -2661,7 +2936,6 @@ export type User = {
   __typename?: 'User';
   active: Scalars['Boolean'];
   apiTokens?: Maybe<Array<ApiToken>>;
-  balance: Scalars['Int'];
   canBill: Scalars['Boolean'];
   cardBrand: Scalars['String'];
   cardLast4: Scalars['String'];
@@ -2676,6 +2950,7 @@ export type User = {
   notifyOnPrUpdate: Setting;
   otpEnabled: Scalars['Boolean'];
   passwordExists: Scalars['Boolean'];
+  sshPublicKeys?: Maybe<Array<SshPublicKey>>;
   tosAcceptedAt: Scalars['Time'];
   intercomHMAC?: Maybe<Scalars['String']>;
 };

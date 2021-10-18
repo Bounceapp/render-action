@@ -8,12 +8,14 @@ Use this action to track a deployment on [Render](https://render.com)
 
 ## Action Inputs
 
-| name         | description                                   |
-| ------------ | --------------------------------------------- |
-| `email`      | User email used to sign-in to Render's API    |
-| `password`   | User password used to sign-in to Render's API |
-| `service-id` | The id of the Render service to be tracked    |
-| `token`      | GitHub token                                  |
+| name         | description                                                                                              |
+| ------------ | -------------------------------------------------------------------------------------------------------- |
+| `email`      | User email used to sign-in to Render's API                                                               |
+| `password`   | User password used to sign-in to Render's API                                                            |
+| `service-id` | The id of the Render service to be tracked                                                               |
+| `token`      | GitHub token                                                                                             |
+| `sleep`      | Sleep time between the render deployment success and setting the Github deployment as successful         |
+| `retries`    | Maximum number of retries trying to find the deployment. Note: Retries will be attempted every 5 seconds |
 
 ## Example usage
 

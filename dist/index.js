@@ -11,7 +11,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getSdk = exports.SignInDocument = exports.PullRequestServersDocument = exports.DeploysDocument = exports.DeployDocument = exports.UserFacingTypeSlug = exports.Setting = exports.RollbackSupportStatus = exports.JobStatus = exports.IacExecutionState = exports.IacExecutionSourceStatus = exports.GitProvider = exports.DatabaseType = exports.DatabaseStatus = exports.DatabaseRole = exports.BillingInfoResponse = exports.BackupStatus = void 0;
+exports.getSdk = exports.SignInDocument = exports.PullRequestServersDocument = exports.DeploysDocument = exports.DeployDocument = exports.UserFacingTypeSlug = exports.StatusState = exports.StatusLabel = exports.Setting = exports.RollbackSupportStatus = exports.PromotionStatus = exports.PermissionStatus = exports.JobStatus = exports.IacExecutionState = exports.IacExecutionSourceStatus = exports.GitProvider = exports.DatabaseType = exports.DatabaseStatus = exports.DatabaseRole = exports.BillingInfoResponse = exports.BackupStatus = void 0;
 const graphql_tag_1 = __importDefault(__webpack_require__(8377));
 var BackupStatus;
 (function (BackupStatus) {
@@ -40,6 +40,7 @@ var DatabaseStatus;
 var DatabaseType;
 (function (DatabaseType) {
     DatabaseType["Postgresql"] = "POSTGRESQL";
+    DatabaseType["Redis"] = "REDIS";
 })(DatabaseType = exports.DatabaseType || (exports.DatabaseType = {}));
 var GitProvider;
 (function (GitProvider) {
@@ -67,6 +68,17 @@ var JobStatus;
     JobStatus["Failed"] = "FAILED";
     JobStatus["Succeeded"] = "SUCCEEDED";
 })(JobStatus = exports.JobStatus || (exports.JobStatus = {}));
+var PermissionStatus;
+(function (PermissionStatus) {
+    PermissionStatus["Pending"] = "pending";
+    PermissionStatus["Granted"] = "granted";
+})(PermissionStatus = exports.PermissionStatus || (exports.PermissionStatus = {}));
+var PromotionStatus;
+(function (PromotionStatus) {
+    PromotionStatus["Active"] = "ACTIVE";
+    PromotionStatus["Expired"] = "EXPIRED";
+    PromotionStatus["Invalid"] = "INVALID";
+})(PromotionStatus = exports.PromotionStatus || (exports.PromotionStatus = {}));
 var RollbackSupportStatus;
 (function (RollbackSupportStatus) {
     RollbackSupportStatus["RollbackSupportUnknown"] = "ROLLBACK_SUPPORT_UNKNOWN";
@@ -82,6 +94,32 @@ var Setting;
     Setting["Notify"] = "NOTIFY";
     Setting["Ignore"] = "IGNORE";
 })(Setting = exports.Setting || (exports.Setting = {}));
+var StatusLabel;
+(function (StatusLabel) {
+    StatusLabel["DeploySucceeded"] = "DEPLOY_SUCCEEDED";
+    StatusLabel["DeployInProgress"] = "DEPLOY_IN_PROGRESS";
+    StatusLabel["DeployFailed"] = "DEPLOY_FAILED";
+    StatusLabel["ServiceFailed"] = "SERVICE_FAILED";
+    StatusLabel["MaintenanceScheduled"] = "MAINTENANCE_SCHEDULED";
+    StatusLabel["MaintenanceInProgress"] = "MAINTENANCE_IN_PROGRESS";
+    StatusLabel["RunSucceeded"] = "RUN_SUCCEEDED";
+    StatusLabel["Running"] = "RUNNING";
+    StatusLabel["RunFailed"] = "RUN_FAILED";
+    StatusLabel["RunCancelled"] = "RUN_CANCELLED";
+    StatusLabel["Available"] = "AVAILABLE";
+    StatusLabel["Creating"] = "CREATING";
+    StatusLabel["Unavailable"] = "UNAVAILABLE";
+    StatusLabel["Unknown"] = "UNKNOWN";
+    StatusLabel["Suspended"] = "SUSPENDED";
+})(StatusLabel = exports.StatusLabel || (exports.StatusLabel = {}));
+var StatusState;
+(function (StatusState) {
+    StatusState["Success"] = "SUCCESS";
+    StatusState["Danger"] = "DANGER";
+    StatusState["Warning"] = "WARNING";
+    StatusState["Processing"] = "PROCESSING";
+    StatusState["Unknown"] = "UNKNOWN";
+})(StatusState = exports.StatusState || (exports.StatusState = {}));
 var UserFacingTypeSlug;
 (function (UserFacingTypeSlug) {
     UserFacingTypeSlug["Cron"] = "cron";
@@ -197,10 +235,6 @@ const graphql_request_1 = __webpack_require__(2476);
 const sdk_1 = __webpack_require__(1498);
 const wait_1 = __webpack_require__(5817);
 /*******************************************
- *** Constants
- ******************************************/
-const MAX_RETRIES = 20;
-/*******************************************
  *** Globals
  ******************************************/
 const client = new graphql_request_1.GraphQLClient('https://api.render.com/graphql');
@@ -257,11 +291,11 @@ function findDeploy(context, serverId, retries = 0) {
         const { deploys } = yield sdk.Deploys({ serverId });
         const deploy = deploys === null || deploys === void 0 ? void 0 : deploys.find(d => d.commitId === context.sha &&
             d.branch === context.ref.replace('refs/heads/', ''));
-        if (deploy) {
+        if (deploy)
             return deploy;
-        }
-        if (++retries < MAX_RETRIES) {
-            //Core.info(`No deployments found. Retrying...(${retries}/${MAX_RETRIES}) ⏱`)
+        const max_retries = ~~Core.getInput('retries');
+        if (++retries < max_retries) {
+            Core.info(`No deployments found. Retrying...(${retries}/${max_retries}) ⏱`);
             yield wait_1.wait(5000);
             return findDeploy(context, serverId, retries);
         }
@@ -297,7 +331,7 @@ function waitForDeploy(deployment) {
                 return;
             case 4: // Failed
                 yield updateDeployment(deployment, 'failure');
-                throw new Error(`Deployment ${render.id} failed! ❌`);
+                throw new Error(`Deployment ${render.id} failed! ❌ (${getDeployUrl(render)})`);
             case 5: // Cancelled
                 yield updateDeployment(deployment, 'inactive');
                 Core.info(`Deployment ${render.id} canceled ⏹`);
@@ -316,12 +350,15 @@ function createDeployment(context, { server }) {
 function updateDeployment({ render, github }, state) {
     return __awaiter(this, void 0, void 0, function* () {
         if (github.state !== state) {
-            yield octokit.repos.createDeploymentStatus(Object.assign(Object.assign({}, Github.context.repo), { deployment_id: github.id, log_url: `https://dashboard.render.com/web/${render.server.id}/deploys/${render.id}`, environment_url: render.server.url, description: state, state }));
+            yield octokit.repos.createDeploymentStatus(Object.assign(Object.assign({}, Github.context.repo), { deployment_id: github.id, log_url: getDeployUrl(render), environment_url: render.server.url, description: state, state }));
             github.state = state;
             return true;
         }
         return false;
     });
+}
+function getDeployUrl(deploy) {
+    return `https://dashboard.render.com/web/${deploy.server.id}/deploys/${deploy.id}`;
 }
 /*******************************************
  *** Main

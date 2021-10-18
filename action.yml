@@ -18,6 +18,10 @@ inputs:
     required: false
     description: Sleep time between the render deployment success and setting the Github deployment as successful
     default: '0'
+  retries:
+    required: false
+    description: 'Maximum number of retries trying to find the deployment. Note: Retries will be attempted every 5 seconds'
+    default: '50'
 runs:
   using: node12
   main: dist/index.js
