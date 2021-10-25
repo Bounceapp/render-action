@@ -287,7 +287,9 @@ function getContext() {
 }
 function findDeploy(context, serverId, retries = 0) {
     return __awaiter(this, void 0, void 0, function* () {
-        Core.info(`Looking deployments for ${serverId}...`);
+        if (retries === 0) {
+            Core.info(`Looking deployments for ${serverId}...`);
+        }
         const { deploys } = yield sdk.Deploys({ serverId });
         const deploy = deploys === null || deploys === void 0 ? void 0 : deploys.find(d => d.commitId === context.sha &&
             d.branch === context.ref.replace('refs/heads/', ''));
@@ -296,7 +298,7 @@ function findDeploy(context, serverId, retries = 0) {
         const max_retries = ~~Core.getInput('retries');
         if (++retries < max_retries) {
             Core.info(`No deployments found. Retrying...(${retries}/${max_retries}) ⏱`);
-            yield wait_1.wait(5000);
+            yield wait_1.wait(~~Core.getInput('wait'));
             return findDeploy(context, serverId, retries);
         }
         else {
@@ -321,7 +323,7 @@ function waitForDeploy(deployment) {
                 if (yield updateDeployment(deployment, 'in_progress')) {
                     Core.info(`Deployment still running... ⏱`);
                 }
-                yield wait_1.wait(3000);
+                yield wait_1.wait(~~Core.getInput('wait'));
                 return waitForDeploy(Object.assign(Object.assign({}, deployment), { render: yield getDeploy(render.id) }));
             case 2: // Live
             case 3: // Succeeded

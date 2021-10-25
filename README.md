@@ -16,6 +16,7 @@ Use this action to track a deployment on [Render](https://render.com)
 | `token`      | GitHub token                                                                                             |
 | `sleep`      | Sleep time between the render deployment success and setting the Github deployment as successful         |
 | `retries`    | Maximum number of retries trying to find the deployment. Note: Retries will be attempted every 5 seconds |
+| `wait`       | Sleep time between retries to find Render deployments statuses                                           |
 
 ## Example usage
 

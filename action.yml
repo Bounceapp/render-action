@@ -1,6 +1,9 @@
 name: Render GitHub Action
 description: GitHub Action to check a Render deployment status
 author: Bounce Inc.
+branding:
+  icon: square
+  color: green
 inputs:
   email:
     required: true
@@ -22,6 +25,10 @@ inputs:
     required: false
     description: 'Maximum number of retries trying to find the deployment. Note: Retries will be attempted every 5 seconds'
     default: '50'
+  wait:
+    required: false
+    description: Sleep time between retries to find Render deployments statuses
+    default: '8000'
 runs:
   using: node12
   main: dist/index.js

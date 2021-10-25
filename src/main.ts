@@ -94,7 +94,9 @@ async function findDeploy(
   serverId: string,
   retries = 0
 ): Promise<RenderDeploy> {
-  Core.info(`Looking deployments for ${serverId}...`)
+  if (retries === 0) {
+    Core.info(`Looking deployments for ${serverId}...`)
+  }
   const {deploys} = await sdk.Deploys({serverId})
   const deploy = deploys?.find(
     d =>
@@ -105,7 +107,7 @@ async function findDeploy(
   const max_retries = ~~Core.getInput('retries')
   if (++retries < max_retries) {
     Core.info(`No deployments found. Retrying...(${retries}/${max_retries}) ⏱`)
-    await wait(5000)
+    await wait(~~Core.getInput('wait'))
     return findDeploy(context, serverId, retries)
   } else {
     throw new Error(`No deployment found after ${retries} retries! ⚠️`)
@@ -127,7 +129,7 @@ async function waitForDeploy(deployment: Deployment): Promise<void> {
       if (await updateDeployment(deployment, 'in_progress')) {
         Core.info(`Deployment still running... ⏱`)
       }
-      await wait(3000)
+      await wait(~~Core.getInput('wait'))
       return waitForDeploy({...deployment, render: await getDeploy(render.id)})
     case 2: // Live
     case 3: // Succeeded

@@ -2445,6 +2445,8 @@ export type Redis = {
   plan?: Maybe<Scalars['String']>;
   name: Scalars['String'];
   owner: Owner;
+  type: DatabaseType;
+  suspenders: Array<Scalars['String']>;
 };
 
 export type RedisInput = {
