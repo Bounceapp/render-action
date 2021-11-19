@@ -34,7 +34,7 @@
     "@graphql-codegen/cli": "1.21.3",
     "@graphql-codegen/typescript": "1.21.1",
     "@graphql-codegen/typescript-graphql-request": "^3.1.0",
-    "@graphql-codegen/typescript-operations": "1.17.15",
+    "@graphql-codegen/typescript-operations": "2.2.1",
     "@octokit/webhooks-definitions": "^3.67.3",
     "@types/jest": "^26.0.23",
     "@types/node": "^14.14.41",
