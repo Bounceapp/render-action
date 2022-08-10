@@ -11,7 +11,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getSdk = exports.SignInDocument = exports.PullRequestServersDocument = exports.DeploysDocument = exports.DeployDocument = exports.UserFacingTypeSlug = exports.StatusState = exports.StatusLabel = exports.Setting = exports.RollbackSupportStatus = exports.PromotionStatus = exports.PermissionStatus = exports.JobStatus = exports.IacExecutionState = exports.IacExecutionSourceStatus = exports.GitProvider = exports.DatabaseType = exports.DatabaseStatus = exports.DatabaseRole = exports.BillingInfoResponse = exports.BackupStatus = void 0;
+exports.getSdk = exports.SignInDocument = exports.ServerDocument = exports.PullRequestServersDocument = exports.DeploysDocument = exports.DeployDocument = exports.UserFacingTypeSlug = exports.StripeConnectionStatus = exports.StatusState = exports.StatusLabel = exports.Setting = exports.SshServiceStatus = exports.RollbackSupportStatus = exports.PromotionStatus = exports.PermissionStatus = exports.OwnerType = exports.MaxmemoryPolicy = exports.JobStatus = exports.InvoiceStatus = exports.IacExecutionState = exports.IacExecutionSourceStatus = exports.GitProvider = exports.DatabaseType = exports.DatabaseStatus = exports.DatabaseRole = exports.BillingStatus = exports.BillingInfoResponse = exports.BackupStatus = void 0;
 const graphql_tag_1 = __importDefault(__webpack_require__(8377));
 var BackupStatus;
 (function (BackupStatus) {
@@ -24,6 +24,14 @@ var BillingInfoResponse;
     BillingInfoResponse["AddressFailed"] = "ADDRESS_FAILED";
     BillingInfoResponse["VatFailed"] = "VAT_FAILED";
 })(BillingInfoResponse = exports.BillingInfoResponse || (exports.BillingInfoResponse = {}));
+var BillingStatus;
+(function (BillingStatus) {
+    BillingStatus["Active"] = "ACTIVE";
+    BillingStatus["Free"] = "FREE";
+    BillingStatus["PaymentMethodRequired"] = "PAYMENT_METHOD_REQUIRED";
+    BillingStatus["Suspended"] = "SUSPENDED";
+    BillingStatus["Unknown"] = "UNKNOWN";
+})(BillingStatus = exports.BillingStatus || (exports.BillingStatus = {}));
 var DatabaseRole;
 (function (DatabaseRole) {
     DatabaseRole["Primary"] = "PRIMARY";
@@ -34,6 +42,7 @@ var DatabaseStatus;
     DatabaseStatus["Creating"] = "CREATING";
     DatabaseStatus["Available"] = "AVAILABLE";
     DatabaseStatus["Unavailable"] = "UNAVAILABLE";
+    DatabaseStatus["ConfigRestart"] = "CONFIG_RESTART";
     DatabaseStatus["Suspended"] = "SUSPENDED";
     DatabaseStatus["Unknown"] = "UNKNOWN";
 })(DatabaseStatus = exports.DatabaseStatus || (exports.DatabaseStatus = {}));
@@ -63,11 +72,34 @@ var IacExecutionState;
     IacExecutionState["Error"] = "ERROR";
     IacExecutionState["Success"] = "SUCCESS";
 })(IacExecutionState = exports.IacExecutionState || (exports.IacExecutionState = {}));
+var InvoiceStatus;
+(function (InvoiceStatus) {
+    InvoiceStatus["Unpaid"] = "UNPAID";
+    InvoiceStatus["CarriedOver"] = "CARRIED_OVER";
+    InvoiceStatus["Paid"] = "PAID";
+    InvoiceStatus["Unknown"] = "UNKNOWN";
+})(InvoiceStatus = exports.InvoiceStatus || (exports.InvoiceStatus = {}));
 var JobStatus;
 (function (JobStatus) {
     JobStatus["Failed"] = "FAILED";
     JobStatus["Succeeded"] = "SUCCEEDED";
 })(JobStatus = exports.JobStatus || (exports.JobStatus = {}));
+var MaxmemoryPolicy;
+(function (MaxmemoryPolicy) {
+    MaxmemoryPolicy["AllkeysLru"] = "allkeys_lru";
+    MaxmemoryPolicy["Noeviction"] = "noeviction";
+    MaxmemoryPolicy["VolatileLru"] = "volatile_lru";
+    MaxmemoryPolicy["VolatileLfu"] = "volatile_lfu";
+    MaxmemoryPolicy["AllkeysLfu"] = "allkeys_lfu";
+    MaxmemoryPolicy["VolatileRandom"] = "volatile_random";
+    MaxmemoryPolicy["AllkeysRandom"] = "allkeys_random";
+    MaxmemoryPolicy["VolatileTtl"] = "volatile_ttl";
+})(MaxmemoryPolicy = exports.MaxmemoryPolicy || (exports.MaxmemoryPolicy = {}));
+var OwnerType;
+(function (OwnerType) {
+    OwnerType["User"] = "USER";
+    OwnerType["Organization"] = "ORGANIZATION";
+})(OwnerType = exports.OwnerType || (exports.OwnerType = {}));
 var PermissionStatus;
 (function (PermissionStatus) {
     PermissionStatus["Pending"] = "pending";
@@ -88,6 +120,13 @@ var RollbackSupportStatus;
     RollbackSupportStatus["RollbackUnsupportedDeployNotTerminal"] = "ROLLBACK_UNSUPPORTED_DEPLOY_NOT_TERMINAL";
     RollbackSupportStatus["RollbackUnsupportedDeployLive"] = "ROLLBACK_UNSUPPORTED_DEPLOY_LIVE";
 })(RollbackSupportStatus = exports.RollbackSupportStatus || (exports.RollbackSupportStatus = {}));
+var SshServiceStatus;
+(function (SshServiceStatus) {
+    SshServiceStatus["Available"] = "AVAILABLE";
+    SshServiceStatus["NotSupported"] = "NOT_SUPPORTED";
+    SshServiceStatus["PaidPlanNeeded"] = "PAID_PLAN_NEEDED";
+    SshServiceStatus["DeployNeeded"] = "DEPLOY_NEEDED";
+})(SshServiceStatus = exports.SshServiceStatus || (exports.SshServiceStatus = {}));
 var Setting;
 (function (Setting) {
     Setting["Default"] = "DEFAULT";
@@ -120,6 +159,12 @@ var StatusState;
     StatusState["Processing"] = "PROCESSING";
     StatusState["Unknown"] = "UNKNOWN";
 })(StatusState = exports.StatusState || (exports.StatusState = {}));
+var StripeConnectionStatus;
+(function (StripeConnectionStatus) {
+    StripeConnectionStatus["Livemode"] = "LIVEMODE";
+    StripeConnectionStatus["Testmode"] = "TESTMODE";
+    StripeConnectionStatus["None"] = "NONE";
+})(StripeConnectionStatus = exports.StripeConnectionStatus || (exports.StripeConnectionStatus = {}));
 var UserFacingTypeSlug;
 (function (UserFacingTypeSlug) {
     UserFacingTypeSlug["Cron"] = "cron";
@@ -162,7 +207,16 @@ exports.PullRequestServersDocument = graphql_tag_1.default `
     }
     server {
       id
+      url
     }
+  }
+}
+    `;
+exports.ServerDocument = graphql_tag_1.default `
+    query Server($id: String!) {
+  server(id: $id) {
+    id
+    url
   }
 }
     `;
@@ -184,6 +238,9 @@ function getSdk(client, withWrapper = defaultWrapper) {
         },
         PullRequestServers(variables, requestHeaders) {
             return withWrapper(() => client.request(exports.PullRequestServersDocument, variables, requestHeaders));
+        },
+        Server(variables, requestHeaders) {
+            return withWrapper(() => client.request(exports.ServerDocument, variables, requestHeaders));
         },
         SignIn(variables, requestHeaders) {
             return withWrapper(() => client.request(exports.SignInDocument, variables, requestHeaders));
@@ -262,15 +319,18 @@ function findServer({ pr }) {
         const serverId = Core.getInput('service-id');
         if (pr) {
             Core.info('Running in Pull Request: Listing Pull Request Servers...');
-            const number = pr.toString();
             const { pullRequestServers } = yield sdk.PullRequestServers({ serverId });
-            const server = pullRequestServers === null || pullRequestServers === void 0 ? void 0 : pullRequestServers.find(s => (s === null || s === void 0 ? void 0 : s.pullRequest.number) === number);
+            const server = pullRequestServers === null || pullRequestServers === void 0 ? void 0 : pullRequestServers.find(s => (s === null || s === void 0 ? void 0 : s.pullRequest.number) === pr.toString());
             if (server && server.server) {
-                return server.server.id;
+                return server.server;
             }
             Core.info('No Pull Request Servers found. Using regular deployment');
         }
-        return serverId;
+        const { server } = yield sdk.Server({ id: serverId });
+        if (!server) {
+            throw new Error(`Server ${serverId} not found! ❌`);
+        }
+        return server;
     });
 }
 function getContext() {
@@ -371,13 +431,16 @@ function run() {
             Core.info('Starting Render Wait Action');
             yield logIn();
             const context = getContext();
-            const serverId = yield findServer(context);
-            const render = yield findDeploy(context, serverId);
+            const server = yield findServer(context);
+            const render = yield findDeploy(context, server.id);
             const github = yield createDeployment(context, render);
             yield waitForDeploy({ render, github });
+            Core.setOutput('url', server.url);
         }
         catch (error) {
-            Core.setFailed(error.message);
+            if (error instanceof Error) {
+                Core.setFailed(error.message);
+            }
         }
     });
 }

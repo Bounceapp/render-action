@@ -27,6 +27,11 @@ type DeploymentState =
   | 'pending'
   | 'success'
 
+type Server = {
+  id: string
+  url: string
+}
+
 /*******************************************
  *** Globals
  ******************************************/
@@ -52,24 +57,27 @@ async function logIn(): Promise<void> {
   client.setHeader('authorization', `Bearer ${signIn.idToken}`)
 }
 
-async function findServer({pr}: Context): Promise<string> {
+async function findServer({pr}: Context): Promise<Server> {
   const serverId = Core.getInput('service-id')
   if (pr) {
     Core.info('Running in Pull Request: Listing Pull Request Servers...')
 
-    const number = pr.toString()
     const {pullRequestServers} = await sdk.PullRequestServers({serverId})
     const server = pullRequestServers?.find(
-      s => s?.pullRequest.number === number
+      s => s?.pullRequest.number === pr.toString()
     )
 
     if (server && server.server) {
-      return server.server.id
+      return server.server
     }
     Core.info('No Pull Request Servers found. Using regular deployment')
   }
 
-  return serverId
+  const {server} = await sdk.Server({id: serverId})
+  if (!server) {
+    throw new Error(`Server ${serverId} not found! ❌`)
+  }
+  return server
 }
 
 function getContext(): Context {
@@ -199,15 +207,19 @@ function getDeployUrl(deploy: RenderDeploy): string {
 async function run(): Promise<void> {
   try {
     Core.info('Starting Render Wait Action')
+
     await logIn()
     const context = getContext()
-    const serverId = await findServer(context)
-    const render = await findDeploy(context, serverId)
+    const server = await findServer(context)
+    const render = await findDeploy(context, server.id)
     const github = await createDeployment(context, render)
-
     await waitForDeploy({render, github})
+
+    Core.setOutput('url', server.url)
   } catch (error) {
-    Core.setFailed(error.message)
+    if (error instanceof Error) {
+      Core.setFailed(error.message)
+    }
   }
 }
 

@@ -29,6 +29,9 @@ inputs:
     required: false
     description: Sleep time between retries to find Render deployments statuses
     default: '8000'
+outputs:
+  url:
+    description: The URL of the Render service
 runs:
   using: node12
   main: dist/index.js
