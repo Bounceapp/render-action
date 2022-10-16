@@ -1,7 +1,9 @@
 import * as Core from '@actions/core'
 import * as Github from '@actions/github'
+import * as Artifact from '@actions/artifact'
 import {PullRequestEvent} from '@octokit/webhooks-definitions/schema'
 import {GraphQLClient} from 'graphql-request'
+import fs from 'fs/promises'
 
 import {Deploy as RenderDeploy, getSdk} from './generated/sdk'
 import {wait} from './wait'
@@ -48,13 +50,31 @@ async function logIn(): Promise<void> {
   Core.info('Signing in...')
 
   const email = Core.getInput('email')
-  const password = Core.getInput('password')
-  const {signIn} = await sdk.SignIn({email, password})
-
-  if (!signIn?.idToken) {
-    throw new Error('Sign-in failed!')
+  const artifactClient = Artifact.create()
+  let token = undefined
+  try {
+    Core.info('Downloading cached token...')
+    await artifactClient.downloadArtifact(`render-${email}`)
+    Core.info('Cached token found. Using it.')
+    token = await fs.readFile('token', 'utf8')
+  } catch {
+    Core.info('Cached token not found. Signing in...')
+    const password = Core.getInput('password')
+    const {signIn} = await sdk.SignIn({email, password})
+    if (!signIn?.idToken) {
+      throw new Error('Sign-in failed!')
+    }
+    token = signIn.idToken
+    // Save the token for future runs
+    Core.info('Caching Render authentication token...')
+    await fs.writeFile('token', token)
+    await artifactClient.uploadArtifact(`render-${email}`, ['token'], '.', {
+      retentionDays: ~~Core.getInput('token-retention-days')
+    })
+    Core.info('Render token cached for future usage.')
   }
-  client.setHeader('authorization', `Bearer ${signIn.idToken}`)
+
+  client.setHeader('authorization', `Bearer ${token}`)
 }
 
 async function findServer({pr}: Context): Promise<Server> {

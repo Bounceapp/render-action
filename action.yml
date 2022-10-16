@@ -17,6 +17,10 @@ inputs:
   token:
     required: true
     description: GitHub token
+  token-retention-days:
+    required: false
+    description: Render authentication token retention days
+    default: '7'
   sleep:
     required: false
     description: Sleep time between the render deployment success and setting the Github deployment as successful
@@ -33,5 +37,5 @@ outputs:
   url:
     description: The URL of the Render service
 runs:
-  using: node12
+  using: node16
   main: dist/index.js

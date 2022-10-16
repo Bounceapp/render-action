@@ -188,6 +188,12 @@ export type BuildDeployEndReason = {
   timedOutSeconds?: Maybe<Scalars['Int']>;
 };
 
+export enum BuildDeployStep {
+  Build = 'BUILD',
+  Internal = 'INTERNAL',
+  Workload = 'WORKLOAD'
+}
+
 export type BuildDeployTrigger = {
   __typename?: 'BuildDeployTrigger';
   firstBuild?: Maybe<Scalars['Boolean']>;
@@ -355,6 +361,7 @@ export type CronJobInput = {
   baseDir?: Maybe<Scalars['String']>;
   branch: Scalars['String'];
   buildCommand: Scalars['String'];
+  buildFilter?: Maybe<BuildFilterInput>;
   command: Scalars['String'];
   dockerCommand?: Maybe<Scalars['String']>;
   dockerfilePath?: Maybe<Scalars['String']>;
@@ -723,6 +730,7 @@ export type FailureReason = {
   oomKilled?: Maybe<OomKilledData>;
   timedOutSeconds?: Maybe<Scalars['Int']>;
   unhealthy?: Maybe<Scalars['String']>;
+  step?: Maybe<BuildDeployStep>;
 };
 
 export type FreeTierUsageByDay = {
@@ -782,14 +790,34 @@ export type GitRepo = {
   defaultBranch: GitBranch;
   languages?: Maybe<Array<Scalars['String']>>;
   branches: Array<GitBranch>;
+  /** @deprecated Use `suggestion` */
+  directorySuggestions: InspectionResult;
+  /** @deprecated Use `suggestion` */
   suggestedEnv?: Maybe<Scalars['String']>;
+  /** @deprecated Use `suggestion` */
   suggestedStartCommand?: Maybe<Scalars['String']>;
+  /** @deprecated Use `suggestion` */
   suggestedBuildCommand?: Maybe<Scalars['String']>;
+  /** @deprecated Use `suggestion` */
   suggestedPublishPath?: Maybe<Scalars['String']>;
+  /** @deprecated Use `suggestion` */
   suggestedFramework?: Maybe<Scalars['String']>;
+  /** @deprecated Use `suggestion` */
   suggestions?: Maybe<Array<Suggestion>>;
+  suggestion: InspectionResult;
   upstreamUpdatedAt?: Maybe<Scalars['Time']>;
   ownerType?: Maybe<OwnerType>;
+};
+
+
+export type GitRepoDirectorySuggestionsArgs = {
+  directory: Scalars['String'];
+};
+
+
+export type GitRepoSuggestionArgs = {
+  directory?: Maybe<Scalars['String']>;
+  ref?: Maybe<Scalars['String']>;
 };
 
 export type GitRepoOwner = {
@@ -903,8 +931,8 @@ export type IacExecutionAndSource = {
 
 export type IacExecutionSource = {
   __typename?: 'IACExecutionSource';
-  id?: Maybe<Scalars['String']>;
-  name?: Maybe<Scalars['String']>;
+  id: Scalars['String'];
+  name: Scalars['String'];
   lastSyncAt?: Maybe<Scalars['Time']>;
   repo?: Maybe<Repo>;
   branch?: Maybe<Scalars['String']>;
@@ -963,6 +991,12 @@ export type InitialDeployHookStarted = ServiceEvent & {
   deployId: Scalars['String'];
   deploy?: Maybe<Deploy>;
   hookId: Scalars['Int'];
+};
+
+export type InspectionResult = {
+  __typename?: 'InspectionResult';
+  primarySuggestion: Suggestion;
+  environmentSuggestions: Array<Suggestion>;
 };
 
 export type Invoice = {
@@ -1103,7 +1137,7 @@ export type Mutation = {
   cancelCronJobRun?: Maybe<CronJobRun>;
   connectStripeAccount: Scalars['Boolean'];
   createCronJob?: Maybe<CronJob>;
-  /** deprecated */
+  /** @deprecated Use `createCustomDomains` */
   createCustomDomain?: Maybe<CustomDomain>;
   createCustomDomains?: Maybe<Array<CustomDomain>>;
   createDatabase?: Maybe<Database>;
@@ -1158,6 +1192,7 @@ export type Mutation = {
   resendEmailVerificationEmail?: Maybe<User>;
   resetEmail?: Maybe<User>;
   resetPassword: Scalars['Boolean'];
+  restartDatabase: Database;
   restoreDiskSnapshot: Server;
   resumeDatabase: Database;
   resumeService: Service;
@@ -1177,7 +1212,6 @@ export type Mutation = {
   suspendDatabase: Database;
   suspendRedis: Redis;
   suspendService: Service;
-  unsubscribeForever: Scalars['Boolean'];
   updateAPIToken?: Maybe<ApiToken>;
   updateBuildFilter?: Maybe<Service>;
   updateBillingInfoWithResult?: Maybe<BillingInfoOutput>;
@@ -1601,6 +1635,11 @@ export type MutationResetPasswordArgs = {
 };
 
 
+export type MutationRestartDatabaseArgs = {
+  id: Scalars['String'];
+};
+
+
 export type MutationRestoreDiskSnapshotArgs = {
   diskId: Scalars['String'];
   snapshotKey: Scalars['String'];
@@ -1703,11 +1742,6 @@ export type MutationSuspendRedisArgs = {
 
 export type MutationSuspendServiceArgs = {
   id: Scalars['String'];
-};
-
-
-export type MutationUnsubscribeForeverArgs = {
-  email: Scalars['String'];
 };
 
 
@@ -2836,6 +2870,7 @@ export type ServerInput = {
   baseDir?: Maybe<Scalars['String']>;
   branch: Scalars['String'];
   buildCommand: Scalars['String'];
+  buildFilter?: Maybe<BuildFilterInput>;
   disk?: Maybe<DiskInput>;
   dockerCommand?: Maybe<Scalars['String']>;
   dockerfilePath?: Maybe<Scalars['String']>;
