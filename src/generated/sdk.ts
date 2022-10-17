@@ -3370,6 +3370,17 @@ export type SignInMutation = (
   )> }
 );
 
+export type UserQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type UserQuery = (
+  { __typename?: 'Query' }
+  & { user?: Maybe<(
+    { __typename?: 'User' }
+    & Pick<User, 'id'>
+  )> }
+);
+
 
 export const DeployDocument = gql`
     query Deploy($id: String!) {
@@ -3425,6 +3436,13 @@ export const SignInDocument = gql`
   }
 }
     `;
+export const UserDocument = gql`
+    query User {
+  user {
+    id
+  }
+}
+    `;
 
 export type SdkFunctionWrapper = <T>(action: () => Promise<T>) => Promise<T>;
 
@@ -3446,6 +3464,9 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
     },
     SignIn(variables: SignInMutationVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<SignInMutation> {
       return withWrapper(() => client.request<SignInMutation>(SignInDocument, variables, requestHeaders));
+    },
+    User(variables?: UserQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<UserQuery> {
+      return withWrapper(() => client.request<UserQuery>(UserDocument, variables, requestHeaders));
     }
   };
 }

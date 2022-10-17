@@ -17,10 +17,6 @@ inputs:
   token:
     required: true
     description: GitHub token
-  token-retention-days:
-    required: false
-    description: Render authentication token retention days
-    default: '7'
   sleep:
     required: false
     description: Sleep time between the render deployment success and setting the Github deployment as successful
