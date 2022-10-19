@@ -50,31 +50,34 @@ async function logIn(): Promise<void> {
   Core.info('Signing in...')
 
   const email = Core.getInput('email')
-  const password = Core.getInput('password')
   const tokenFileName = 'token'
   const tokenKey = `render-${email}`
 
+  let token = undefined
   try {
     Core.info('Downloading cached token...')
     await Cache.restoreCache([tokenFileName], tokenKey)
-    Core.info('Cached token found. Using it.')
-    const token = await fs.readFile(tokenFileName, 'utf8')
-    client.setHeader('authorization', `Bearer ${token}`)
+    token = await fs.readFile(tokenFileName, 'utf8')
+
     // Test token
-    await sdk.User()
+    await sdk.User(undefined, {authorization: `Bearer ${token}`})
+    Core.info('Cached token found. Using it.')
   } catch (error) {
     Core.info(`Cached token not found (${error}). Signing in...`)
+    const password = Core.getInput('password')
     const {signIn} = await sdk.SignIn({email, password})
     if (!signIn?.idToken) {
       throw new Error('Sign-in failed!')
     }
-    client.setHeader('authorization', `Bearer ${signIn.idToken}`)
+    token = signIn.idToken
+
     // Save the token for future runs
     Core.info('Caching Render authentication token...')
-    await fs.writeFile(tokenFileName, signIn.idToken)
+    await fs.writeFile(tokenFileName, token)
     await Cache.saveCache([tokenFileName], tokenKey)
     Core.info('Render token cached for future usage.')
   }
+  client.setHeader('authorization', `Bearer ${token}`)
 }
 
 async function findServer({pr}: Context): Promise<Server> {

@@ -335,31 +335,32 @@ function logIn() {
     return __awaiter(this, void 0, void 0, function* () {
         Core.info('Signing in...');
         const email = Core.getInput('email');
-        const password = Core.getInput('password');
         const tokenFileName = 'token';
         const tokenKey = `render-${email}`;
+        let token = undefined;
         try {
             Core.info('Downloading cached token...');
             yield Cache.restoreCache([tokenFileName], tokenKey);
-            Core.info('Cached token found. Using it.');
-            const token = yield promises_1.default.readFile(tokenFileName, 'utf8');
-            client.setHeader('authorization', `Bearer ${token}`);
+            token = yield promises_1.default.readFile(tokenFileName, 'utf8');
             // Test token
-            yield sdk.User();
+            yield sdk.User(undefined, { authorization: `Bearer ${token}` });
+            Core.info('Cached token found. Using it.');
         }
         catch (error) {
             Core.info(`Cached token not found (${error}). Signing in...`);
+            const password = Core.getInput('password');
             const { signIn } = yield sdk.SignIn({ email, password });
             if (!(signIn === null || signIn === void 0 ? void 0 : signIn.idToken)) {
                 throw new Error('Sign-in failed!');
             }
-            client.setHeader('authorization', `Bearer ${signIn.idToken}`);
+            token = signIn.idToken;
             // Save the token for future runs
             Core.info('Caching Render authentication token...');
-            yield promises_1.default.writeFile(tokenFileName, signIn.idToken);
+            yield promises_1.default.writeFile(tokenFileName, token);
             yield Cache.saveCache([tokenFileName], tokenKey);
             Core.info('Render token cached for future usage.');
         }
+        client.setHeader('authorization', `Bearer ${token}`);
     });
 }
 function findServer({ pr }) {
