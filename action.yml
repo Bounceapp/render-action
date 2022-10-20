@@ -11,6 +11,9 @@ inputs:
   password:
     required: true
     description: User password used to sign-in to Render's API
+  render-token:
+    required: false
+    description: Render API token to use instead of the email/password combination
   service-id:
     required: true
     description: The id of the Render service to be tracked

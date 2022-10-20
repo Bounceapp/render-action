@@ -47,36 +47,20 @@ const octokit = Github.getOctokit(Core.getInput('token'), {
  *** Functions
  ******************************************/
 async function logIn(): Promise<void> {
-  Core.info('Signing in...')
-
-  const email = Core.getInput('email')
-  const tokenFileName = 'token'
-  const tokenKey = `render-${email}`
-
-  let token = undefined
-  try {
-    Core.info('Downloading cached token...')
-    await Cache.restoreCache([tokenFileName], tokenKey)
-    token = await fs.readFile(tokenFileName, 'utf8')
-
-    // Test token
-    await sdk.User(undefined, {authorization: `Bearer ${token}`})
-    Core.info('Cached token found. Using it.')
-  } catch (error) {
-    Core.info(`Cached token not found (${error}). Signing in...`)
+  let token = Core.getInput('render-token')
+  if (token) {
+    Core.info('Using existing token...')
+  } else {
+    Core.info('Signing in...')
+    const email = Core.getInput('email')
     const password = Core.getInput('password')
     const {signIn} = await sdk.SignIn({email, password})
     if (!signIn?.idToken) {
       throw new Error('Sign-in failed!')
     }
     token = signIn.idToken
-
-    // Save the token for future runs
-    Core.info('Caching Render authentication token...')
-    await fs.writeFile(tokenFileName, token)
-    await Cache.saveCache([tokenFileName], tokenKey)
-    Core.info('Render token cached for future usage.')
   }
+
   client.setHeader('authorization', `Bearer ${token}`)
 }
 
