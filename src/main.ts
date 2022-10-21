@@ -1,92 +1,72 @@
 import * as Core from '@actions/core'
 import * as Github from '@actions/github'
-import * as Cache from '@actions/cache'
-import {PullRequestEvent} from '@octokit/webhooks-definitions/schema'
-import {GraphQLClient} from 'graphql-request'
-import fs from 'fs/promises'
+import {HttpClient} from '@actions/http-client'
+import {BearerCredentialHandler} from '@actions/http-client/lib/auth'
+import {PullRequestEvent} from '@octokit/webhooks-types'
 
-import {Deploy as RenderDeploy, getSdk} from './generated/sdk'
 import {wait} from './wait'
 
 /*******************************************
- *** Constants
+ *** Types
  ******************************************/
 type Context = {sha: string; ref: string; pr?: number}
 
-type GitHubDeploy = {id: number; state?: DeploymentState}
+type GitHubDeploy = {id: number; state?: GitHubDeployState}
+
+type RenderService = {
+  id: string
+  name: string
+  ownerId: string
+  serviceDetails: {
+    parentServer: {id: string}
+    url: string
+  }
+}
+
+type RenderServiceCursor = {
+  cursor: string
+  service: RenderService
+}
+
+type RenderDeploy = {
+  id: string
+  commit: {id: string}
+  status:
+    | 'created'
+    | 'build_in_progress'
+    | 'update_in_progress'
+    | 'live'
+    | 'deactivated'
+    | 'build_failed'
+    | 'update_failed'
+    | 'canceled'
+  service: RenderService
+}
+
+type RenderDeployCursor = {
+  cursor: string
+  deploy: RenderDeploy
+}
 
 type Deployment = {
   render: RenderDeploy
   github: GitHubDeploy
 }
 
-type DeploymentState =
-  | 'error'
-  | 'failure'
-  | 'inactive'
-  | 'in_progress'
-  | 'queued'
-  | 'pending'
-  | 'success'
-
-type Server = {
-  id: string
-  url: string
-}
+type GitHubDeployState = 'error' | 'failure' | 'inactive' | 'in_progress' | 'queued' | 'pending' | 'success'
 
 /*******************************************
  *** Globals
  ******************************************/
-const client = new GraphQLClient('https://api.render.com/graphql')
-const sdk = getSdk(client)
-const octokit = Github.getOctokit(Core.getInput('token'), {
+const client = new HttpClient('render-action', [new BearerCredentialHandler(Core.getInput('render-token'))])
+
+const octokit = Github.getOctokit(Core.getInput('github-token'), {
   previews: ['flash', 'ant-man']
 })
 
 /*******************************************
  *** Functions
  ******************************************/
-async function logIn(): Promise<void> {
-  let token = Core.getInput('render-token')
-  if (token) {
-    Core.info('Using existing token...')
-  } else {
-    Core.info('Signing in...')
-    const email = Core.getInput('email')
-    const password = Core.getInput('password')
-    const {signIn} = await sdk.SignIn({email, password})
-    if (!signIn?.idToken) {
-      throw new Error('Sign-in failed!')
-    }
-    token = signIn.idToken
-  }
-
-  client.setHeader('authorization', `Bearer ${token}`)
-}
-
-async function findServer({pr}: Context): Promise<Server> {
-  const serverId = Core.getInput('service-id')
-  if (pr) {
-    Core.info('Running in Pull Request: Listing Pull Request Servers...')
-
-    const {pullRequestServers} = await sdk.PullRequestServers({serverId})
-    const server = pullRequestServers?.find(
-      s => s?.pullRequest.number === pr.toString()
-    )
-
-    if (server && server.server) {
-      return server.server
-    }
-    Core.info('No Pull Request Servers found. Using regular deployment')
-  }
-
-  const {server} = await sdk.Server({id: serverId})
-  if (!server) {
-    throw new Error(`Server ${serverId} not found! ❌`)
-  }
-  return server
-}
-
 function getContext(): Context {
   const {eventName, payload} = Github.context
   switch (eventName) {
@@ -98,84 +78,100 @@ function getContext(): Context {
     case 'push':
       return Github.context
     default:
-      throw new Error(
-        'Invalid event type! Only "pull_request" and "push" are supported. ❌'
-      )
+      throw new Error('Invalid event type! Only "pull_request" and "push" are supported. ❌')
   }
 }
 
-async function findDeploy(
-  context: Context,
-  serverId: string,
-  retries = 0
-): Promise<RenderDeploy> {
-  if (retries === 0) {
-    Core.info(`Looking deployments for ${serverId}...`)
+async function findService({pr}: Context): Promise<RenderService> {
+  const serviceId = Core.getInput('service-id')
+  const {result: service} = await client.getJson<RenderService>(`https://api.render.com/v1/services/${serviceId}`)
+  if (!service) {
+    throw new Error(`Server ${serviceId} not found! ❌`)
   }
-  const {deploys} = await sdk.Deploys({serverId})
-  const deploy = deploys?.find(
-    d =>
-      d.commitId === context.sha &&
-      d.branch === context.ref.replace('refs/heads/', '')
-  ) as RenderDeploy
-  if (deploy) return deploy
+
+  if (pr) {
+    Core.info('Running in Pull Request: Listing Pull Request Servers...')
+    const {result: cursors} = await client.getJson<RenderServiceCursor[]>(
+      `https://api.render.com/v1/services?name=${service.name}%20PR%20%23${pr}&ownerId=${service.ownerId}`
+    )
+
+    const prService = cursors?.find(c => c.service.serviceDetails.parentServer.id === service.id)?.service
+    if (prService) return prService
+    Core.info('No Pull Request Servers found. Using regular deployment')
+  }
+
+  return service
+}
+
+async function findDeploy(context: Context, service: RenderService, retries = 0): Promise<RenderDeploy> {
+  if (retries === 0) {
+    Core.info(`Looking deployments for ${service.id}...`)
+  }
+
+  const {result: cursors} = await client.getJson<RenderDeployCursor[]>(
+    `https://api.render.com/v1/services/${service.id}/deploys`
+  )
+
+  const deploy = cursors?.find(c => c.deploy.commit.id === context.sha)?.deploy
+  if (deploy) return {...deploy, service}
+
   const max_retries = ~~Core.getInput('retries')
   if (++retries < max_retries) {
     Core.info(`No deployments found. Retrying...(${retries}/${max_retries}) ⏱`)
     await wait(~~Core.getInput('wait'))
-    return findDeploy(context, serverId, retries)
+    return findDeploy(context, service, retries)
   } else {
     throw new Error(`No deployment found after ${retries} retries! ⚠️`)
   }
 }
 
-async function getDeploy(id: string): Promise<RenderDeploy> {
-  const {deploy} = await sdk.Deploy({id})
+async function getDeploy({id, service}: RenderDeploy): Promise<RenderDeploy> {
+  const {result: deploy} = await client.getJson<RenderDeploy>(
+    `https://api.render.com/v1/services/${service.id}/deploys/${id}`
+  )
   if (!deploy) {
     throw new Error(`Deployment ${id} disappeared! ❌`)
   }
-  return deploy as RenderDeploy
+  return {...deploy, service}
 }
 
 async function waitForDeploy(deployment: Deployment): Promise<void> {
   const {render} = deployment
   switch (render?.status) {
-    case 1: // Running
+    case 'created':
+    case 'build_in_progress':
+    case 'update_in_progress':
       if (await updateDeployment(deployment, 'in_progress')) {
         Core.info(`Deployment still running... ⏱`)
       }
       await wait(~~Core.getInput('wait'))
-      return waitForDeploy({...deployment, render: await getDeploy(render.id)})
-    case 2: // Live
-    case 3: // Succeeded
+      return waitForDeploy({...deployment, render: await getDeploy(render)})
+    case 'live':
       await wait(~~Core.getInput('sleep'))
       await updateDeployment(deployment, 'success')
       Core.info(`Deployment ${render.id} succeeded ✅`)
       return
-    case 4: // Failed
+    case 'build_failed':
+    case 'update_failed':
       await updateDeployment(deployment, 'failure')
 
-      throw new Error(
-        `Deployment ${render.id} failed! ❌ (${getDeployUrl(render)})`
-      )
-    case 5: // Cancelled
+      throw new Error(`Deployment ${render.id} failed! ❌ (${getDeployUrl(render)})`)
+    case 'deactivated': // Failed
+    case 'canceled': // Cancelled
       await updateDeployment(deployment, 'inactive')
       Core.info(`Deployment ${render.id} canceled ⏹`)
       return
   }
 }
 
-async function createDeployment(
-  context: Context,
-  {server}: RenderDeploy
-): Promise<GitHubDeploy> {
-  Core.info(`Creating ${server.name} GitHub deployment`)
-  const state: DeploymentState = 'pending'
-  const {data} = await octokit.repos.createDeployment({
+async function createDeployment(context: Context, {service}: RenderDeploy): Promise<GitHubDeploy> {
+  Core.info(`Creating ${service.name} GitHub deployment`)
+  const state: GitHubDeployState = 'pending'
+  const {data} = await octokit.rest.repos.createDeployment({
     ...Github.context.repo,
     ref: context.ref,
-    description: server.name,
-    environment: `${context.pr ? 'Preview' : 'Production'} – ${server.name}`,
+    description: service.name,
+    environment: `${context.pr ? 'Preview' : 'Production'} – ${service.name}`,
     production_environment: !context.pr,
     transient_environment: !!context.pr,
     auto_merge: false,
@@ -185,16 +181,13 @@ async function createDeployment(
   return {...data, state} as GitHubDeploy
 }
 
-async function updateDeployment(
-  {render, github}: Deployment,
-  state: DeploymentState
-): Promise<boolean> {
+async function updateDeployment({render, github}: Deployment, state: GitHubDeployState): Promise<boolean> {
   if (github.state !== state) {
-    await octokit.repos.createDeploymentStatus({
+    await octokit.rest.repos.createDeploymentStatus({
       ...Github.context.repo,
       deployment_id: github.id,
       log_url: getDeployUrl(render),
-      environment_url: render.server.url,
+      environment_url: render.service.serviceDetails.url,
       description: state,
       state
     })
@@ -205,7 +198,7 @@ async function updateDeployment(
 }
 
 function getDeployUrl(deploy: RenderDeploy): string {
-  return `https://dashboard.render.com/web/${deploy.server.id}/deploys/${deploy.id}`
+  return `https://dashboard.render.com/web/${deploy.service.id}/deploys/${deploy.id}`
 }
 
 /*******************************************
@@ -215,14 +208,13 @@ async function run(): Promise<void> {
   try {
     Core.info('Starting Render Wait Action')
 
-    await logIn()
     const context = getContext()
-    const server = await findServer(context)
-    const render = await findDeploy(context, server.id)
+    const service = await findService(context)
+    const render = await findDeploy(context, service)
     const github = await createDeployment(context, render)
     await waitForDeploy({render, github})
 
-    Core.setOutput('url', server.url)
+    Core.setOutput('url', service.serviceDetails.url)
   } catch (error) {
     if (error instanceof Error) {
       Core.setFailed(error.message)

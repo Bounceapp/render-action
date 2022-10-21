@@ -1,6 +1,0 @@
-query Server($id: String!) {
-  server(id: $id) {
-    id
-    url
-  }
-}
