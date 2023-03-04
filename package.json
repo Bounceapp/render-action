@@ -28,7 +28,7 @@
     "@actions/http-client": "^2.0.1"
   },
   "devDependencies": {
-    "@octokit/webhooks-types": "^6.5.0",
+    "@octokit/webhooks-types": "^6.10.0",
     "@types/node": "^18.14.4",
     "@vercel/ncc": "^0.34.0",
     "js-yaml": "^4.1.0",
