@@ -28,6 +28,16 @@ type RenderServiceCursor = {
   service: RenderService
 }
 
+type RenderCustomDomain = {
+  id: string
+  name: string
+}
+
+type RenderCustomDomainCursor = {
+  cursor: string
+  customDomain: RenderCustomDomain
+}
+
 type RenderDeploy = {
   id: string
   commit: {id: string}
@@ -82,6 +92,15 @@ function getContext(): Context {
   }
 }
 
+async function findCustomDomain({id: service_id}: RenderService): Promise<string | undefined> {
+  const {result: domains} = await client.getJson<RenderCustomDomainCursor[]>(
+    `https://api.render.com/v1/services/${service_id}/domains?verificationStatus=verified&limit=1`
+  )
+  if (domains && domains.length > 0) {
+    return domains[0].customDomain.name
+  }
+}
+
 async function findService({pr}: Context): Promise<RenderService> {
   const serviceId = Core.getInput('service-id')
   const {result: service} = await client.getJson<RenderService>(`https://api.render.com/v1/services/${serviceId}`)
@@ -98,6 +117,12 @@ async function findService({pr}: Context): Promise<RenderService> {
     const prService = cursors?.find(c => c.service.serviceDetails.parentServer.id === service.id)?.service
     if (prService) return prService
     Core.info('No Pull Request Servers found. Using regular deployment')
+  }
+
+  const customDomain = await findCustomDomain(service)
+  if (customDomain) {
+    Core.info(`Using custom domain ${customDomain}`)
+    service.serviceDetails.url = customDomain
   }
 
   return service
