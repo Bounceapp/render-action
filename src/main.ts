@@ -101,31 +101,43 @@ async function findCustomDomain({id: service_id}: RenderService): Promise<string
   }
 }
 
-async function findService({pr}: Context): Promise<RenderService> {
+async function findService(context: Context, retries = 0): Promise<RenderService> {
   const serviceId = Core.getInput('service-id')
   const {result: service} = await client.getJson<RenderService>(`https://api.render.com/v1/services/${serviceId}`)
   if (!service) {
     throw new Error(`Server ${serviceId} not found! ❌`)
   }
 
-  if (pr) {
+  if (context.pr) {
     Core.info('Running in Pull Request: Listing Pull Request Servers...')
-    const {result: cursors} = await client.getJson<RenderServiceCursor[]>(
-      `https://api.render.com/v1/services?name=${service.name}%20PR%20%23${pr}&ownerId=${service.ownerId}`
-    )
+    return findPRService(context.pr, service, retries)
+  } else {
+    const customDomain = await findCustomDomain(service)
+    if (customDomain) {
+      Core.info(`Using custom domain ${customDomain}`)
+      service.serviceDetails.url = customDomain
+    }
 
-    const prService = cursors?.find(c => c.service.serviceDetails.parentServer.id === service.id)?.service
-    if (prService) return prService
-    Core.info('No Pull Request Servers found. Using regular deployment')
+    return service
   }
+}
 
-  const customDomain = await findCustomDomain(service)
-  if (customDomain) {
-    Core.info(`Using custom domain ${customDomain}`)
-    service.serviceDetails.url = customDomain
+async function findPRService(pr: number, parentService: RenderService, retries = 0): Promise<RenderService> {
+  const {result: cursors} = await client.getJson<RenderServiceCursor[]>(
+    `https://api.render.com/v1/services?name=${parentService.name}%20PR%20%23${pr}&ownerId=${parentService.ownerId}`
+  )
+
+  const prService = cursors?.find(c => c.service.serviceDetails.parentServer.id === parentService.id)?.service
+  if (prService) return prService
+
+  const max_retries = ~~Core.getInput('retries')
+  if (++retries < max_retries) {
+    Core.info(`No pull request service found. Retrying...(${retries}/${max_retries}) ⏱`)
+    await wait(~~Core.getInput('wait'))
+    return findPRService(pr, parentService, retries)
+  } else {
+    throw new Error(`No pull request service found after ${retries} retries! ⚠️`)
   }
-
-  return service
 }
 
 async function findDeploy(context: Context, service: RenderService, retries = 0): Promise<RenderDeploy> {
