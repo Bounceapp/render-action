@@ -74,28 +74,43 @@ function findCustomDomain({ id: service_id }) {
         }
     });
 }
-function findService({ pr }) {
-    var _a;
+function findService(context, retries = 0) {
     return __awaiter(this, void 0, void 0, function* () {
         const serviceId = Core.getInput('service-id');
         const { result: service } = yield client.getJson(`https://api.render.com/v1/services/${serviceId}`);
         if (!service) {
             throw new Error(`Server ${serviceId} not found! ❌`);
         }
-        if (pr) {
+        if (context.pr) {
             Core.info('Running in Pull Request: Listing Pull Request Servers...');
-            const { result: cursors } = yield client.getJson(`https://api.render.com/v1/services?name=${service.name}%20PR%20%23${pr}&ownerId=${service.ownerId}`);
-            const prService = (_a = cursors === null || cursors === void 0 ? void 0 : cursors.find(c => c.service.serviceDetails.parentServer.id === service.id)) === null || _a === void 0 ? void 0 : _a.service;
-            if (prService)
-                return prService;
-            Core.info('No Pull Request Servers found. Using regular deployment');
+            return findPRService(context.pr, service, retries);
         }
-        const customDomain = yield findCustomDomain(service);
-        if (customDomain) {
-            Core.info(`Using custom domain ${customDomain}`);
-            service.serviceDetails.url = customDomain;
+        else {
+            const customDomain = yield findCustomDomain(service);
+            if (customDomain) {
+                Core.info(`Using custom domain ${customDomain}`);
+                service.serviceDetails.url = customDomain;
+            }
+            return service;
         }
-        return service;
+    });
+}
+function findPRService(pr, parentService, retries = 0) {
+    var _a;
+    return __awaiter(this, void 0, void 0, function* () {
+        const { result: cursors } = yield client.getJson(`https://api.render.com/v1/services?name=${parentService.name}%20PR%20%23${pr}&ownerId=${parentService.ownerId}`);
+        const prService = (_a = cursors === null || cursors === void 0 ? void 0 : cursors.find(c => c.service.serviceDetails.parentServer.id === parentService.id)) === null || _a === void 0 ? void 0 : _a.service;
+        if (prService)
+            return prService;
+        const max_retries = ~~Core.getInput('retries');
+        if (++retries < max_retries) {
+            Core.info(`No pull request service found. Retrying...(${retries}/${max_retries}) ⏱`);
+            yield (0, wait_1.wait)(~~Core.getInput('wait'));
+            return findPRService(pr, parentService, retries);
+        }
+        else {
+            throw new Error(`No pull request service found after ${retries} retries! ⚠️`);
+        }
     });
 }
 function findDeploy(context, service, retries = 0) {
