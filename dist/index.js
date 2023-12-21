@@ -149,6 +149,7 @@ function waitForDeploy(deployment) {
         switch (render === null || render === void 0 ? void 0 : render.status) {
             case 'created':
             case 'build_in_progress':
+            case 'pre_deploy_in_progress':
             case 'update_in_progress':
                 if (yield updateDeployment(deployment, 'in_progress')) {
                     Core.info(`Deployment still running... ⏱`);
@@ -161,6 +162,7 @@ function waitForDeploy(deployment) {
                 Core.info(`Deployment ${render.id} succeeded ✅`);
                 return;
             case 'build_failed':
+            case 'pre_deploy_failed':
             case 'update_failed':
                 yield updateDeployment(deployment, 'failure');
                 throw new Error(`Deployment ${render.id} failed! ❌ (${getDeployUrl(render)})`);

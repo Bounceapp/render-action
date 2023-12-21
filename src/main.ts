@@ -50,6 +50,8 @@ type RenderDeploy = {
     | 'build_failed'
     | 'update_failed'
     | 'canceled'
+    | 'pre_deploy_in_progress'
+    | 'pre_deploy_failed'
   service: RenderService
 }
 
@@ -177,6 +179,7 @@ async function waitForDeploy(deployment: Deployment): Promise<void> {
   switch (render?.status) {
     case 'created':
     case 'build_in_progress':
+    case 'pre_deploy_in_progress':
     case 'update_in_progress':
       if (await updateDeployment(deployment, 'in_progress')) {
         Core.info(`Deployment still running... ⏱`)
@@ -189,6 +192,7 @@ async function waitForDeploy(deployment: Deployment): Promise<void> {
       Core.info(`Deployment ${render.id} succeeded ✅`)
       return
     case 'build_failed':
+    case 'pre_deploy_failed':
     case 'update_failed':
       await updateDeployment(deployment, 'failure')
 
