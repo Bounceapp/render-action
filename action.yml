@@ -30,5 +30,5 @@ outputs:
   url:
     description: The URL of the Render service
 runs:
-  using: node16
+  using: node20
   main: dist/index.js
