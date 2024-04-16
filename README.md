@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Wait for Render Deployment
-        uses: bounceapp/render-action@0.6.0
+        uses: bounceapp/render-action@0.8.0
         with:
           render-token: ${{ secrets.RENDER_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
