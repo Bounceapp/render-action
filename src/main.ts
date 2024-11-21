@@ -78,7 +78,7 @@ const fetchWithRetry = async <TData>(url: string, retryNumber = 0): Promise<Type
   try {
     return await client.getJson<TData>(url)
   } catch (error) {
-    const canRetry = retryNumber <= MAX_RETRIES
+    const canRetry = retryNumber < MAX_RETRIES
     const isTimeoutError = error instanceof Error && /timeout/i.test(error.message)
 
     if (isTimeoutError && canRetry) {

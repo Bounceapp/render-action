@@ -48,6 +48,20 @@ const wait_1 = __nccwpck_require__(5817);
  *** Globals
  ******************************************/
 const client = new http_client_1.HttpClient('render-action', [new auth_1.BearerCredentialHandler(Core.getInput('render-token'))]);
+const MAX_RETRIES = 3;
+const fetchWithRetry = (url, retryNumber = 0) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        return yield client.getJson(url);
+    }
+    catch (error) {
+        const canRetry = retryNumber < MAX_RETRIES;
+        const isTimeoutError = error instanceof Error && /timeout/i.test(error.message);
+        if (isTimeoutError && canRetry) {
+            return fetchWithRetry(url, retryNumber + 1);
+        }
+        throw error;
+    }
+});
 const octokit = Github.getOctokit(Core.getInput('github-token'), {
     previews: ['flash', 'ant-man']
 });
@@ -68,7 +82,7 @@ function getContext() {
 }
 function findCustomDomain({ id: service_id }) {
     return __awaiter(this, void 0, void 0, function* () {
-        const { result: domains } = yield client.getJson(`https://api.render.com/v1/services/${service_id}/domains?verificationStatus=verified&limit=1`);
+        const { result: domains } = yield fetchWithRetry(`https://api.render.com/v1/services/${service_id}/domains?verificationStatus=verified&limit=1`);
         if (domains && domains.length > 0) {
             return domains[0].customDomain.name;
         }
@@ -77,7 +91,7 @@ function findCustomDomain({ id: service_id }) {
 function findService(context, retries = 0) {
     return __awaiter(this, void 0, void 0, function* () {
         const serviceId = Core.getInput('service-id');
-        const { result: service } = yield client.getJson(`https://api.render.com/v1/services/${serviceId}`);
+        const { result: service } = yield fetchWithRetry(`https://api.render.com/v1/services/${serviceId}`);
         if (!service) {
             throw new Error(`Server ${serviceId} not found! ❌`);
         }
@@ -98,7 +112,7 @@ function findService(context, retries = 0) {
 function findPRService(pr, parentService, retries = 0) {
     var _a;
     return __awaiter(this, void 0, void 0, function* () {
-        const { result: cursors } = yield client.getJson(`https://api.render.com/v1/services?name=${parentService.name}%20PR%20%23${pr}&ownerId=${parentService.ownerId}`);
+        const { result: cursors } = yield fetchWithRetry(`https://api.render.com/v1/services?name=${parentService.name}%20PR%20%23${pr}&ownerId=${parentService.ownerId}`);
         const prService = (_a = cursors === null || cursors === void 0 ? void 0 : cursors.find(c => c.service.serviceDetails.parentServer.id === parentService.id)) === null || _a === void 0 ? void 0 : _a.service;
         if (prService)
             return prService;
@@ -119,7 +133,7 @@ function findDeploy(context, service, retries = 0) {
         if (retries === 0) {
             Core.info(`Looking deployments for ${service.id}...`);
         }
-        const { result: cursors } = yield client.getJson(`https://api.render.com/v1/services/${service.id}/deploys`);
+        const { result: cursors } = yield fetchWithRetry(`https://api.render.com/v1/services/${service.id}/deploys`);
         const deploy = (_a = cursors === null || cursors === void 0 ? void 0 : cursors.find(c => c.deploy.commit.id === context.sha)) === null || _a === void 0 ? void 0 : _a.deploy;
         if (deploy)
             return Object.assign(Object.assign({}, deploy), { service });
@@ -136,7 +150,7 @@ function findDeploy(context, service, retries = 0) {
 }
 function getDeploy({ id, service }) {
     return __awaiter(this, void 0, void 0, function* () {
-        const { result: deploy } = yield client.getJson(`https://api.render.com/v1/services/${service.id}/deploys/${id}`);
+        const { result: deploy } = yield fetchWithRetry(`https://api.render.com/v1/services/${service.id}/deploys/${id}`);
         if (!deploy) {
             throw new Error(`Deployment ${id} disappeared! ❌`);
         }
