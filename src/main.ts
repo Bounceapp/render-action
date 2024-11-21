@@ -5,6 +5,7 @@ import {BearerCredentialHandler} from '@actions/http-client/lib/auth'
 import {PullRequestEvent} from '@octokit/webhooks-types'
 
 import {wait} from './wait'
+import {TypedResponse} from '@actions/http-client/lib/interfaces'
 
 /*******************************************
  *** Types
@@ -72,6 +73,22 @@ type GitHubDeployState = 'error' | 'failure' | 'inactive' | 'in_progress' | 'que
  ******************************************/
 const client = new HttpClient('render-action', [new BearerCredentialHandler(Core.getInput('render-token'))])
 
+const MAX_RETRIES = 3
+const fetchWithRetry = async <TData>(url: string, retryNumber = 0): Promise<TypedResponse<TData>> => {
+  try {
+    return await client.getJson<TData>(url)
+  } catch (error) {
+    const canRetry = retryNumber < MAX_RETRIES
+    const isTimeoutError = error instanceof Error && /timeout/i.test(error.message)
+
+    if (isTimeoutError && canRetry) {
+      return fetchWithRetry(url, retryNumber + 1)
+    }
+
+    throw error
+  }
+}
+
 const octokit = Github.getOctokit(Core.getInput('github-token'), {
   previews: ['flash', 'ant-man']
 })
@@ -95,9 +112,10 @@ function getContext(): Context {
 }
 
 async function findCustomDomain({id: service_id}: RenderService): Promise<string | undefined> {
-  const {result: domains} = await client.getJson<RenderCustomDomainCursor[]>(
+  const {result: domains} = await fetchWithRetry<RenderCustomDomainCursor[]>(
     `https://api.render.com/v1/services/${service_id}/domains?verificationStatus=verified&limit=1`
   )
+
   if (domains && domains.length > 0) {
     return domains[0].customDomain.name
   }
@@ -105,7 +123,7 @@ async function findCustomDomain({id: service_id}: RenderService): Promise<string
 
 async function findService(context: Context, retries = 0): Promise<RenderService> {
   const serviceId = Core.getInput('service-id')
-  const {result: service} = await client.getJson<RenderService>(`https://api.render.com/v1/services/${serviceId}`)
+  const {result: service} = await fetchWithRetry<RenderService>(`https://api.render.com/v1/services/${serviceId}`)
   if (!service) {
     throw new Error(`Server ${serviceId} not found! ❌`)
   }
@@ -125,7 +143,7 @@ async function findService(context: Context, retries = 0): Promise<RenderService
 }
 
 async function findPRService(pr: number, parentService: RenderService, retries = 0): Promise<RenderService> {
-  const {result: cursors} = await client.getJson<RenderServiceCursor[]>(
+  const {result: cursors} = await fetchWithRetry<RenderServiceCursor[]>(
     `https://api.render.com/v1/services?name=${parentService.name}%20PR%20%23${pr}&ownerId=${parentService.ownerId}`
   )
 
@@ -147,7 +165,7 @@ async function findDeploy(context: Context, service: RenderService, retries = 0)
     Core.info(`Looking deployments for ${service.id}...`)
   }
 
-  const {result: cursors} = await client.getJson<RenderDeployCursor[]>(
+  const {result: cursors} = await fetchWithRetry<RenderDeployCursor[]>(
     `https://api.render.com/v1/services/${service.id}/deploys`
   )
 
@@ -165,7 +183,7 @@ async function findDeploy(context: Context, service: RenderService, retries = 0)
 }
 
 async function getDeploy({id, service}: RenderDeploy): Promise<RenderDeploy> {
-  const {result: deploy} = await client.getJson<RenderDeploy>(
+  const {result: deploy} = await fetchWithRetry<RenderDeploy>(
     `https://api.render.com/v1/services/${service.id}/deploys/${id}`
   )
   if (!deploy) {
