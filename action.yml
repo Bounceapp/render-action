@@ -12,8 +12,8 @@ inputs:
     required: false
     description: Render API token to use instead of the email/password combination
   github-token:
-    required: true
-    description: GitHub token
+    required: false
+    description: GitHub token. Only required if `create-deployment` is `true`
   sleep:
     required: false
     description: Sleep time between the render deployment success and setting the Github deployment as successful
@@ -26,6 +26,10 @@ inputs:
     required: false
     description: Sleep time between retries to find Render deployments statuses
     default: '8000'
+  create-deployment:
+    required: false
+    description: Whether to create a new deployment on GitHub. Render might be handling this for you already.
+    default: 'true'
 outputs:
   url:
     description: The URL of the Render service

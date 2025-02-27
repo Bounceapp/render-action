@@ -89,9 +89,16 @@ const fetchWithRetry = async <TData>(url: string, retryNumber = 0): Promise<Type
   }
 }
 
-const octokit = Github.getOctokit(Core.getInput('github-token'), {
-  previews: ['flash', 'ant-man']
-})
+const shouldCreateGitHubDeployment = Core.getBooleanInput('create-deployment')
+
+const octokit = () => {
+  const token = Core.getInput('github-token')
+  if (!token) {
+    throw new Error('No GitHub token provided! ❌')
+  }
+
+  return Github.getOctokit(token, {previews: ['flash', 'ant-man']})
+}
 
 /*******************************************
  *** Functions
@@ -224,9 +231,15 @@ async function waitForDeploy(deployment: Deployment): Promise<void> {
 }
 
 async function createDeployment(context: Context, {service}: RenderDeploy): Promise<GitHubDeploy> {
-  Core.info(`Creating ${service.name} GitHub deployment`)
   const state: GitHubDeployState = 'pending'
-  const {data} = await octokit.rest.repos.createDeployment({
+
+  if (!shouldCreateGitHubDeployment) {
+    Core.info(`Not creating a GitHub deployment for ${service.name} because "create-deployment" is not "true"`)
+    return {id: 0, state}
+  }
+
+  Core.info(`Creating ${service.name} GitHub deployment`)
+  const {data} = await octokit().rest.repos.createDeployment({
     ...Github.context.repo,
     ref: context.ref,
     description: service.name,
@@ -237,12 +250,17 @@ async function createDeployment(context: Context, {service}: RenderDeploy): Prom
     required_contexts: [],
     state
   })
+
   return {...data, state} as GitHubDeploy
 }
 
 async function updateDeployment({render, github}: Deployment, state: GitHubDeployState): Promise<boolean> {
-  if (github.state !== state) {
-    await octokit.rest.repos.createDeploymentStatus({
+  if (github.state === state) return false
+
+  github.state = state
+
+  if (shouldCreateGitHubDeployment) {
+    await octokit().rest.repos.createDeploymentStatus({
       ...Github.context.repo,
       deployment_id: github.id,
       log_url: getDeployUrl(render),
@@ -250,10 +268,9 @@ async function updateDeployment({render, github}: Deployment, state: GitHubDeplo
       description: state,
       state
     })
-    github.state = state
-    return true
   }
-  return false
+
+  return true
 }
 
 function getDeployUrl(deploy: RenderDeploy): string {
