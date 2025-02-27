@@ -62,9 +62,14 @@ const fetchWithRetry = (url, retryNumber = 0) => __awaiter(void 0, void 0, void 
         throw error;
     }
 });
-const octokit = Github.getOctokit(Core.getInput('github-token'), {
-    previews: ['flash', 'ant-man']
-});
+const shouldCreateGitHubDeployment = Core.getBooleanInput('create-deployment');
+const octokit = () => {
+    const token = Core.getInput('github-token');
+    if (!token) {
+        throw new Error('No GitHub token provided! ❌');
+    }
+    return Github.getOctokit(token, { previews: ['flash', 'ant-man'] });
+};
 /*******************************************
  *** Functions
  ******************************************/
@@ -190,20 +195,25 @@ function waitForDeploy(deployment) {
 }
 function createDeployment(context, { service }) {
     return __awaiter(this, void 0, void 0, function* () {
-        Core.info(`Creating ${service.name} GitHub deployment`);
         const state = 'pending';
-        const { data } = yield octokit.rest.repos.createDeployment(Object.assign(Object.assign({}, Github.context.repo), { ref: context.ref, description: service.name, environment: `${context.pr ? 'Preview' : 'Production'} – ${service.name}`, production_environment: !context.pr, transient_environment: !!context.pr, auto_merge: false, required_contexts: [], state }));
+        if (!shouldCreateGitHubDeployment) {
+            Core.info(`Not creating a GitHub deployment for ${service.name} because "create-deployment" is not "true"`);
+            return { id: 0, state };
+        }
+        Core.info(`Creating ${service.name} GitHub deployment`);
+        const { data } = yield octokit().rest.repos.createDeployment(Object.assign(Object.assign({}, Github.context.repo), { ref: context.ref, description: service.name, environment: `${context.pr ? 'Preview' : 'Production'} – ${service.name}`, production_environment: !context.pr, transient_environment: !!context.pr, auto_merge: false, required_contexts: [], state }));
         return Object.assign(Object.assign({}, data), { state });
     });
 }
 function updateDeployment({ render, github }, state) {
     return __awaiter(this, void 0, void 0, function* () {
-        if (github.state !== state) {
-            yield octokit.rest.repos.createDeploymentStatus(Object.assign(Object.assign({}, Github.context.repo), { deployment_id: github.id, log_url: getDeployUrl(render), environment_url: render.service.serviceDetails.url, description: state, state }));
-            github.state = state;
-            return true;
+        if (github.state === state)
+            return false;
+        github.state = state;
+        if (shouldCreateGitHubDeployment) {
+            yield octokit().rest.repos.createDeploymentStatus(Object.assign(Object.assign({}, Github.context.repo), { deployment_id: github.id, log_url: getDeployUrl(render), environment_url: render.service.serviceDetails.url, description: state, state }));
         }
-        return false;
+        return true;
     });
 }
 function getDeployUrl(deploy) {
