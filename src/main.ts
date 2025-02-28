@@ -12,8 +12,6 @@ import {TypedResponse} from '@actions/http-client/lib/interfaces'
  ******************************************/
 type Context = {sha: string; ref: string; pr?: number}
 
-type GitHubDeploy = {id: number; state?: GitHubDeployState}
-
 type RenderService = {
   id: string
   name: string
@@ -61,12 +59,10 @@ type RenderDeployCursor = {
   deploy: RenderDeploy
 }
 
-type Deployment = {
+type WaitForDeployArgs = {
   render: RenderDeploy
-  github: GitHubDeploy
+  previousStatus?: RenderDeploy['status']
 }
-
-type GitHubDeployState = 'error' | 'failure' | 'inactive' | 'in_progress' | 'queued' | 'pending' | 'success'
 
 /*******************************************
  *** Globals
@@ -88,10 +84,6 @@ const fetchWithRetry = async <TData>(url: string, retryNumber = 0): Promise<Type
     throw error
   }
 }
-
-const octokit = Github.getOctokit(Core.getInput('github-token'), {
-  previews: ['flash', 'ant-man']
-})
 
 /*******************************************
  *** Functions
@@ -192,68 +184,30 @@ async function getDeploy({id, service}: RenderDeploy): Promise<RenderDeploy> {
   return {...deploy, service}
 }
 
-async function waitForDeploy(deployment: Deployment): Promise<void> {
-  const {render} = deployment
+async function waitForDeploy({render, previousStatus}: WaitForDeployArgs): Promise<void> {
   switch (render?.status) {
     case 'created':
     case 'build_in_progress':
     case 'pre_deploy_in_progress':
     case 'update_in_progress':
-      if (await updateDeployment(deployment, 'in_progress')) {
+      if (previousStatus !== render.status) {
         Core.info(`Deployment still running... ⏱`)
       }
       await wait(~~Core.getInput('wait'))
-      return waitForDeploy({...deployment, render: await getDeploy(render)})
+      return waitForDeploy({render: await getDeploy(render), previousStatus: render.status})
     case 'live':
       await wait(~~Core.getInput('sleep'))
-      await updateDeployment(deployment, 'success')
       Core.info(`Deployment ${render.id} succeeded ✅`)
       return
     case 'build_failed':
     case 'pre_deploy_failed':
     case 'update_failed':
-      await updateDeployment(deployment, 'failure')
-
       throw new Error(`Deployment ${render.id} failed! ❌ (${getDeployUrl(render)})`)
     case 'deactivated': // Failed
     case 'canceled': // Cancelled
-      await updateDeployment(deployment, 'inactive')
       Core.info(`Deployment ${render.id} canceled ⏹`)
       return
   }
-}
-
-async function createDeployment(context: Context, {service}: RenderDeploy): Promise<GitHubDeploy> {
-  Core.info(`Creating ${service.name} GitHub deployment`)
-  const state: GitHubDeployState = 'pending'
-  const {data} = await octokit.rest.repos.createDeployment({
-    ...Github.context.repo,
-    ref: context.ref,
-    description: service.name,
-    environment: `${context.pr ? 'Preview' : 'Production'} – ${service.name}`,
-    production_environment: !context.pr,
-    transient_environment: !!context.pr,
-    auto_merge: false,
-    required_contexts: [],
-    state
-  })
-  return {...data, state} as GitHubDeploy
-}
-
-async function updateDeployment({render, github}: Deployment, state: GitHubDeployState): Promise<boolean> {
-  if (github.state !== state) {
-    await octokit.rest.repos.createDeploymentStatus({
-      ...Github.context.repo,
-      deployment_id: github.id,
-      log_url: getDeployUrl(render),
-      environment_url: render.service.serviceDetails.url,
-      description: state,
-      state
-    })
-    github.state = state
-    return true
-  }
-  return false
 }
 
 function getDeployUrl(deploy: RenderDeploy): string {
@@ -270,8 +224,7 @@ async function run(): Promise<void> {
     const context = getContext()
     const service = await findService(context)
     const render = await findDeploy(context, service)
-    const github = await createDeployment(context, render)
-    await waitForDeploy({render, github})
+    await waitForDeploy({render})
 
     Core.setOutput('url', service.serviceDetails.url)
   } catch (error) {
