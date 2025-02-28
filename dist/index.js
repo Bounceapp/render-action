@@ -62,14 +62,6 @@ const fetchWithRetry = (url, retryNumber = 0) => __awaiter(void 0, void 0, void 
         throw error;
     }
 });
-const shouldCreateGitHubDeployment = Core.getBooleanInput('create-deployment');
-const octokit = () => {
-    const token = Core.getInput('github-token');
-    if (!token) {
-        throw new Error('No GitHub token provided! ❌');
-    }
-    return Github.getOctokit(token, { previews: ['flash', 'ant-man'] });
-};
 /*******************************************
  *** Functions
  ******************************************/
@@ -162,58 +154,31 @@ function getDeploy({ id, service }) {
         return Object.assign(Object.assign({}, deploy), { service });
     });
 }
-function waitForDeploy(deployment) {
+function waitForDeploy({ render, previousStatus }) {
     return __awaiter(this, void 0, void 0, function* () {
-        const { render } = deployment;
         switch (render === null || render === void 0 ? void 0 : render.status) {
             case 'created':
             case 'build_in_progress':
             case 'pre_deploy_in_progress':
             case 'update_in_progress':
-                if (yield updateDeployment(deployment, 'in_progress')) {
+                if (previousStatus !== render.status) {
                     Core.info(`Deployment still running... ⏱`);
                 }
                 yield (0, wait_1.wait)(~~Core.getInput('wait'));
-                return waitForDeploy(Object.assign(Object.assign({}, deployment), { render: yield getDeploy(render) }));
+                return waitForDeploy({ render: yield getDeploy(render), previousStatus: render.status });
             case 'live':
                 yield (0, wait_1.wait)(~~Core.getInput('sleep'));
-                yield updateDeployment(deployment, 'success');
                 Core.info(`Deployment ${render.id} succeeded ✅`);
                 return;
             case 'build_failed':
             case 'pre_deploy_failed':
             case 'update_failed':
-                yield updateDeployment(deployment, 'failure');
                 throw new Error(`Deployment ${render.id} failed! ❌ (${getDeployUrl(render)})`);
             case 'deactivated': // Failed
             case 'canceled': // Cancelled
-                yield updateDeployment(deployment, 'inactive');
                 Core.info(`Deployment ${render.id} canceled ⏹`);
                 return;
         }
-    });
-}
-function createDeployment(context, { service }) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const state = 'pending';
-        if (!shouldCreateGitHubDeployment) {
-            Core.info(`Not creating a GitHub deployment for ${service.name} because "create-deployment" is not "true"`);
-            return { id: 0, state };
-        }
-        Core.info(`Creating ${service.name} GitHub deployment`);
-        const { data } = yield octokit().rest.repos.createDeployment(Object.assign(Object.assign({}, Github.context.repo), { ref: context.ref, description: service.name, environment: `${context.pr ? 'Preview' : 'Production'} – ${service.name}`, production_environment: !context.pr, transient_environment: !!context.pr, auto_merge: false, required_contexts: [], state }));
-        return Object.assign(Object.assign({}, data), { state });
-    });
-}
-function updateDeployment({ render, github }, state) {
-    return __awaiter(this, void 0, void 0, function* () {
-        if (github.state === state)
-            return false;
-        github.state = state;
-        if (shouldCreateGitHubDeployment) {
-            yield octokit().rest.repos.createDeploymentStatus(Object.assign(Object.assign({}, Github.context.repo), { deployment_id: github.id, log_url: getDeployUrl(render), environment_url: render.service.serviceDetails.url, description: state, state }));
-        }
-        return true;
     });
 }
 function getDeployUrl(deploy) {
@@ -229,8 +194,7 @@ function run() {
             const context = getContext();
             const service = yield findService(context);
             const render = yield findDeploy(context, service);
-            const github = yield createDeployment(context, render);
-            yield waitForDeploy({ render, github });
+            yield waitForDeploy({ render });
             Core.setOutput('url', service.serviceDetails.url);
         }
         catch (error) {
