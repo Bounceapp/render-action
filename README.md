@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Wait for Render Deployment
-        uses: bounceapp/render-action@0.8.0
+        uses: bounceapp/render-action@0.12.0
         with:
           render-token: ${{ secrets.RENDER_TOKEN }}
           service-id: srv-xxxxxxxxxxxxxxxxxxxx
