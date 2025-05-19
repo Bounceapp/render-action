@@ -16,6 +16,13 @@ Use this action to track a deployment on [Render](https://render.com)
 | `retries`      | Maximum number of retries trying to find the deployment. **Note:** Retries will be attempted every 5 seconds</br>*(default: 50)* | No ❌      |
 | `wait`         | Sleep time between retries to find Render deployments statuses<br/>*(default: 8000 [8 seconds])*                                 | No ❌      |
 
+## Action Outputs
+
+| Name     | Description                                 |
+| -------- | ------------------------------------------- |
+| `url`    | The URL of the Render service               |
+| `status` | The status of the Render service deployment |
+
 ## Example usage
 
 ```yaml
