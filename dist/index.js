@@ -162,7 +162,7 @@ function waitForDeploy({ render, previousStatus }) {
             case 'pre_deploy_in_progress':
             case 'update_in_progress':
                 if (previousStatus !== render.status) {
-                    Core.info(`Deployment still running... ⏱`);
+                    Core.info(`Deployment still running... ⏱️ (${getDeployUrl(render)})`);
                 }
                 yield (0, wait_1.wait)(~~Core.getInput('wait'));
                 return waitForDeploy({ render: yield getDeploy(render), previousStatus: render.status });
@@ -176,7 +176,7 @@ function waitForDeploy({ render, previousStatus }) {
                 throw new Error(`Deployment ${render.id} failed! ❌ (${getDeployUrl(render)})`);
             case 'deactivated': // Failed
             case 'canceled': // Cancelled
-                Core.info(`Deployment ${render.id} canceled ⏹`);
+                Core.info(`Deployment ${render.id} canceled. ⏹️ (${getDeployUrl(render)})`);
                 return;
         }
     });
@@ -196,6 +196,7 @@ function run() {
             const render = yield findDeploy(context, service);
             yield waitForDeploy({ render });
             Core.setOutput('url', service.serviceDetails.url);
+            Core.setOutput('status', render === null || render === void 0 ? void 0 : render.status);
         }
         catch (error) {
             if (error instanceof Error) {
