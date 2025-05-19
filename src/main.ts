@@ -191,7 +191,7 @@ async function waitForDeploy({render, previousStatus}: WaitForDeployArgs): Promi
     case 'pre_deploy_in_progress':
     case 'update_in_progress':
       if (previousStatus !== render.status) {
-        Core.info(`Deployment still running... ⏱`)
+        Core.info(`Deployment still running... ⏱️ (${getDeployUrl(render)})`)
       }
       await wait(~~Core.getInput('wait'))
       return waitForDeploy({render: await getDeploy(render), previousStatus: render.status})
@@ -205,7 +205,7 @@ async function waitForDeploy({render, previousStatus}: WaitForDeployArgs): Promi
       throw new Error(`Deployment ${render.id} failed! ❌ (${getDeployUrl(render)})`)
     case 'deactivated': // Failed
     case 'canceled': // Cancelled
-      Core.info(`Deployment ${render.id} canceled ⏹`)
+      Core.info(`Deployment ${render.id} canceled. ⏹️ (${getDeployUrl(render)})`)
       return
   }
 }
@@ -227,6 +227,7 @@ async function run(): Promise<void> {
     await waitForDeploy({render})
 
     Core.setOutput('url', service.serviceDetails.url)
+    Core.setOutput('status', render?.status)
   } catch (error) {
     if (error instanceof Error) {
       Core.setFailed(error.message)

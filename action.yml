@@ -26,6 +26,8 @@ inputs:
 outputs:
   url:
     description: The URL of the Render service
+  status:
+    description: The status of the Render service deployment
 runs:
   using: node20
   main: dist/index.js
